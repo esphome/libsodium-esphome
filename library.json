@@ -33,6 +33,9 @@
         ],
         "srcFilter": [
             "-<*>",
+            "+<crypto_generichash/blake2b>",
+            "+<crypto_stream/salsa20>",
+            "+<crypto_pwhash/argon2>",
             "+<crypto_aead/chacha20poly1305/sodium/aead_chacha20poly1305.c>",
             "+<crypto_core/ed25519/core_ed25519.c>",
             "+<crypto_core/ed25519/core_ristretto255.c>",
