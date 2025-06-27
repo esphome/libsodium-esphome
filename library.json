@@ -46,6 +46,7 @@
             "+<crypto_core/ed25519/core_ed25519.c>",
             "+<crypto_core/ed25519/core_ristretto255.c>",
             "+<crypto_core/ed25519/ref10/ed25519_ref10.c>",
+            "+<crypto_core/softaes/softaes.c>",
             "+<crypto_hash/crypto_hash.c>",
             "+<crypto_sign/ed25519/sign_ed25519.c>",
             "+<crypto_sign/ed25519/ref10/keypair.c>",
