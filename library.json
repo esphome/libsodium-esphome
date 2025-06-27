@@ -33,7 +33,6 @@
         ],
         "srcFilter": [
             "-<*>",
-            "+<../../stubs.c>",
             "+<crypto_stream/salsa20>",
             "+<crypto_core/salsa>",
             "+<randombytes>",
