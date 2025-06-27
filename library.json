@@ -45,6 +45,7 @@
             "+<crypto_onetimeauth/poly1305/onetimeauth_poly1305.c>",
             "+<crypto_scalarmult/crypto_scalarmult.c>",
             "+<crypto_scalarmult/curve25519/ref10/x25519_ref10.c>",
+            "+<crypto_core/ed25519/ref10/ed25519_ref10.c>",
             "+<crypto_scalarmult/curve25519/scalarmult_curve25519.c>",
             "+<crypto_stream/chacha20/ref/chacha20_ref.c>",
             "+<crypto_stream/chacha20/stream_chacha20.c>",
