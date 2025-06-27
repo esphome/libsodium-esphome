@@ -62,7 +62,7 @@
             "+<crypto_stream/chacha20/ref/chacha20_ref.c>",
             "+<crypto_stream/chacha20/stream_chacha20.c>",
             "+<crypto_stream/crypto_stream.c>",
-            "+<crypto_verify/sodium/verify.c>",
+            "+<crypto_verify/verify.c>",
             "+<sodium/codecs.c>",
             "+<sodium/core.c>",
             "+<sodium/runtime.c>",
