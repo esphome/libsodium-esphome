@@ -1,0 +1,28 @@
+diff --git a/src/libsodium/sodium/core.c b/src/libsodium/sodium/core.c
+index 214ef5f8..4cf6fb3a 100644
+--- a/src/libsodium/sodium/core.c
++++ b/src/libsodium/sodium/core.c
+@@ -21,6 +21,23 @@
+ #include "private/implementations.h"
+ #include "private/mutex.h"
+ 
++/* Stub implementations for unused algorithms in ESPHome */
++int _crypto_pwhash_argon2_pick_best_implementation(void) {
++    return 0;
++}
++
++int _crypto_generichash_blake2b_pick_best_implementation(void) {
++    return 0;
++}
++
++int _crypto_aead_aegis128l_pick_best_implementation(void) {
++    return 0;
++}
++
++int _crypto_aead_aegis256_pick_best_implementation(void) {
++    return 0;
++}
++
+ static volatile int initialized;
+ static volatile int locked;
+ 
