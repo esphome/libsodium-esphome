@@ -1,0 +1,8 @@
+description: "ESPHome's libsodium port"
+url: "https://github.com/esphome/libsodium-esphome.git"
+repository: "https://github.com/esphome/libsodium-esphome.git"
+files:
+  use_gitignore: true
+  exclude:
+    - library.json
+    - .gitignore
