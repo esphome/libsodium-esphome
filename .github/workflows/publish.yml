@@ -19,7 +19,15 @@ jobs:
           python-version: '3.x'
       - name: Install platformio
         run: pip install --upgrade platformio
+      - name: Apply patches
+        run: |-
+          for f in patches/*.patch; do
+            echo "Applying patch $f"
+            git -C libsodium apply "../${f}"
+          done
+      - name: Package library
+        run: pio package -o dist/
       - name: Publish package
         env:
           PLATFORMIO_AUTH_TOKEN: ${{ secrets.PLATFORMIO_AUTH_TOKEN }}
-        run: pio package publish --owner esphome --non-interactive
+        run: pio package publish --owner esphome --non-interactive dist/libsodium-${{ github.event.release.tag_name }}.tar.gz
