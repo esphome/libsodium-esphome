@@ -1,0 +1,23 @@
+name: Publish
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  publish-platformio:
+    name: Publish to PlatformIO
+    runs-on: ubuntu-latest
+    environment: platformio
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Install platformio
+        run: pip install --upgrade platformio
+      - name: Publish package
+        env:
+          PLATFORMIO_AUTH_TOKEN: ${{ secrets.PLATFORMIO_AUTH_TOKEN }}
+        run: pio package publish --owner esphome --non-interactive
