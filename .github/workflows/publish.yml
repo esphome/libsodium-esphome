@@ -26,7 +26,7 @@ jobs:
             git -C libsodium apply "../${f}"
           done
       - name: Package library
-        run: pio package -o dist/
+        run: pio package pack -o dist/
       - name: Publish package
         env:
           PLATFORMIO_AUTH_TOKEN: ${{ secrets.PLATFORMIO_AUTH_TOKEN }}
