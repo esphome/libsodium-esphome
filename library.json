@@ -1,6 +1,6 @@
 {
     "name": "libsodium",
-    "version": "1.10020.3",
+    "version": "1.10020.4",
     "description": "ESPHome's libsodium port",
     "keywords": "libsodium",
     "repository": {
