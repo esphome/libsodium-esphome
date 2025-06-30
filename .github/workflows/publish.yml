@@ -25,6 +25,8 @@ jobs:
             echo "Applying patch $f"
             git -C libsodium apply "../${f}"
           done
+      - name: Create dist directory
+        run: mkdir -p dist
       - name: Package library
         run: pio package pack -o dist/
       - name: Publish package
