@@ -26,10 +26,12 @@
 # endif
 #endif
 
+static int checks = 0;
 static int failures = 0;
 
 static void check(int ok, const char *what)
 {
+    checks++;
     if (!ok) {
         printf("FAIL: %s\n", what);
         failures++;
@@ -193,9 +195,9 @@ int main(void)
     printf("session fast path not present; reference tests only\n");
 #endif
     if (failures) {
-        printf("%d failure%s\n", failures, failures == 1 ? "" : "s");
+        printf("%d of %d checks failed\n", failures, checks);
         return 1;
     }
-    printf("all known-answer and differential tests passed\n");
+    printf("all %d known-answer and differential checks passed\n", checks);
     return 0;
 }
