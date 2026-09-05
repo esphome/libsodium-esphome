@@ -17,6 +17,7 @@
 #include <string.h>
 
 #include <sodium/crypto_aead_chacha20poly1305.h>
+#include <sodium/crypto_hash_sha256.h>
 #include <sodium/crypto_stream_chacha20.h>
 
 #if defined(__has_include)
@@ -170,6 +171,19 @@ static void test_session_counter_continuation(void)
 
 int main(void)
 {
+    /* FIPS 180-4 example: SHA-256("abc"). Guards the round constant table
+       patch 07 relocates on ESP8266. */
+    {
+        static const unsigned char expected[32] = {
+            0xba, 0x78, 0x16, 0xbf, 0x8f, 0x01, 0xcf, 0xea, 0x41, 0x41, 0x40, 0xde,
+            0x5d, 0xae, 0x22, 0x23, 0xb0, 0x03, 0x61, 0xa3, 0x96, 0x17, 0x7a, 0x9c,
+            0xb4, 0x10, 0xff, 0x61, 0xf2, 0x00, 0x15, 0xad
+        };
+        unsigned char out[32];
+        crypto_hash_sha256(out, (const unsigned char *) "abc", 3);
+        check(memcmp(out, expected, 32) == 0, "sha256 known answer");
+    }
+
     test_rfc8439_kat();
 #ifdef SODIUM_ESPHOME_NOISE_FAST_PATH
     test_session_differential();
