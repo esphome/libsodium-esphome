@@ -9,7 +9,9 @@
    rate-limits itself to at most one yield per interval_us of CONT time,
    so the cadence is ~1 ms regardless of loop cost, and a non-firing call
    is only a cycle-count read. The call sites do not depend on secret data. */
-#if defined(ESP8266) || defined(ARDUINO_ARCH_ESP8266)
+#include "sodium/esphome_platform.h"
+
+#ifdef SODIUM_ESPHOME_ESP8266
 #include <stdint.h>
 #ifdef __cplusplus
 extern "C" void optimistic_yield(uint32_t interval_us);
