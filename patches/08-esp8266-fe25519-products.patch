@@ -1,0 +1,298 @@
+diff --git a/src/libsodium/include/sodium/private/ed25519_ref10_fe_25_5.h b/src/libsodium/include/sodium/private/ed25519_ref10_fe_25_5.h
+index 4652f0d..5b122b1 100644
+--- a/src/libsodium/include/sodium/private/ed25519_ref10_fe_25_5.h
++++ b/src/libsodium/include/sodium/private/ed25519_ref10_fe_25_5.h
+@@ -3,6 +3,32 @@
+ #include "private/common.h"
+ #include "utils.h"
+ 
++#include "sodium/esphome_platform.h"
++
++#ifdef SODIUM_ESPHOME_ESP8266_PATHS
++/* ESPHome ESP8266 port. The LX106 has no 32x32->64 multiply, so gcc turns
++   every int64 limb product below into a ROM __umulsidi3 call plus two mull
++   for the sign cross terms; four 16-bit partial products are cheaper. The
++   products are also summed into each output limb as they are formed
++   instead of being kept as 100 live int64 temporaries,
++   which spill on a 16 register core. The integer sums are the same, so the
++   results are bit identical to the reference code kept below. */
++static inline int64_t
++fe25519_mul32x32(int32_t a, int32_t b)
++{
++    uint32_t ua = (uint32_t) a, ub = (uint32_t) b;
++    uint32_t al = ua & 0xffff, ah = ua >> 16, bl = ub & 0xffff, bh = ub >> 16;
++    uint32_t ll = al * bl, lh = al * bh, hl = ah * bl, hh = ah * bh;
++    uint32_t mid = (ll >> 16) + (lh & 0xffff) + (hl & 0xffff);
++    uint32_t hi = hh + (lh >> 16) + (hl >> 16) + (mid >> 16);
++    uint32_t lo = (mid << 16) | (ll & 0xffff);
++
++    /* a * b = ua * ub - (a < 0 ? ub << 32 : 0) - (b < 0 ? ua << 32 : 0) */
++    hi -= (ub & (uint32_t) (a >> 31)) + (ua & (uint32_t) (b >> 31));
++    return (int64_t) (((uint64_t) hi << 32) | lo);
++}
++#endif
++
+ /*
+  h = 0
+  */
+@@ -384,6 +410,108 @@ fe25519_mul(fe25519 h, const fe25519 f, const fe25519 g)
+     int32_t f7_2  = 2 * f7;
+     int32_t f9_2  = 2 * f9;
+ 
++#ifdef SODIUM_ESPHOME_ESP8266_PATHS
++    int64_t h0 = fe25519_mul32x32(f0, g0);
++    h0 += fe25519_mul32x32(f1_2, g9_19);
++    h0 += fe25519_mul32x32(f2, g8_19);
++    h0 += fe25519_mul32x32(f3_2, g7_19);
++    h0 += fe25519_mul32x32(f4, g6_19);
++    h0 += fe25519_mul32x32(f5_2, g5_19);
++    h0 += fe25519_mul32x32(f6, g4_19);
++    h0 += fe25519_mul32x32(f7_2, g3_19);
++    h0 += fe25519_mul32x32(f8, g2_19);
++    h0 += fe25519_mul32x32(f9_2, g1_19);
++    int64_t h1 = fe25519_mul32x32(f0, g1);
++    h1 += fe25519_mul32x32(f1, g0);
++    h1 += fe25519_mul32x32(f2, g9_19);
++    h1 += fe25519_mul32x32(f3, g8_19);
++    h1 += fe25519_mul32x32(f4, g7_19);
++    h1 += fe25519_mul32x32(f5, g6_19);
++    h1 += fe25519_mul32x32(f6, g5_19);
++    h1 += fe25519_mul32x32(f7, g4_19);
++    h1 += fe25519_mul32x32(f8, g3_19);
++    h1 += fe25519_mul32x32(f9, g2_19);
++    int64_t h2 = fe25519_mul32x32(f0, g2);
++    h2 += fe25519_mul32x32(f1_2, g1);
++    h2 += fe25519_mul32x32(f2, g0);
++    h2 += fe25519_mul32x32(f3_2, g9_19);
++    h2 += fe25519_mul32x32(f4, g8_19);
++    h2 += fe25519_mul32x32(f5_2, g7_19);
++    h2 += fe25519_mul32x32(f6, g6_19);
++    h2 += fe25519_mul32x32(f7_2, g5_19);
++    h2 += fe25519_mul32x32(f8, g4_19);
++    h2 += fe25519_mul32x32(f9_2, g3_19);
++    int64_t h3 = fe25519_mul32x32(f0, g3);
++    h3 += fe25519_mul32x32(f1, g2);
++    h3 += fe25519_mul32x32(f2, g1);
++    h3 += fe25519_mul32x32(f3, g0);
++    h3 += fe25519_mul32x32(f4, g9_19);
++    h3 += fe25519_mul32x32(f5, g8_19);
++    h3 += fe25519_mul32x32(f6, g7_19);
++    h3 += fe25519_mul32x32(f7, g6_19);
++    h3 += fe25519_mul32x32(f8, g5_19);
++    h3 += fe25519_mul32x32(f9, g4_19);
++    int64_t h4 = fe25519_mul32x32(f0, g4);
++    h4 += fe25519_mul32x32(f1_2, g3);
++    h4 += fe25519_mul32x32(f2, g2);
++    h4 += fe25519_mul32x32(f3_2, g1);
++    h4 += fe25519_mul32x32(f4, g0);
++    h4 += fe25519_mul32x32(f5_2, g9_19);
++    h4 += fe25519_mul32x32(f6, g8_19);
++    h4 += fe25519_mul32x32(f7_2, g7_19);
++    h4 += fe25519_mul32x32(f8, g6_19);
++    h4 += fe25519_mul32x32(f9_2, g5_19);
++    int64_t h5 = fe25519_mul32x32(f0, g5);
++    h5 += fe25519_mul32x32(f1, g4);
++    h5 += fe25519_mul32x32(f2, g3);
++    h5 += fe25519_mul32x32(f3, g2);
++    h5 += fe25519_mul32x32(f4, g1);
++    h5 += fe25519_mul32x32(f5, g0);
++    h5 += fe25519_mul32x32(f6, g9_19);
++    h5 += fe25519_mul32x32(f7, g8_19);
++    h5 += fe25519_mul32x32(f8, g7_19);
++    h5 += fe25519_mul32x32(f9, g6_19);
++    int64_t h6 = fe25519_mul32x32(f0, g6);
++    h6 += fe25519_mul32x32(f1_2, g5);
++    h6 += fe25519_mul32x32(f2, g4);
++    h6 += fe25519_mul32x32(f3_2, g3);
++    h6 += fe25519_mul32x32(f4, g2);
++    h6 += fe25519_mul32x32(f5_2, g1);
++    h6 += fe25519_mul32x32(f6, g0);
++    h6 += fe25519_mul32x32(f7_2, g9_19);
++    h6 += fe25519_mul32x32(f8, g8_19);
++    h6 += fe25519_mul32x32(f9_2, g7_19);
++    int64_t h7 = fe25519_mul32x32(f0, g7);
++    h7 += fe25519_mul32x32(f1, g6);
++    h7 += fe25519_mul32x32(f2, g5);
++    h7 += fe25519_mul32x32(f3, g4);
++    h7 += fe25519_mul32x32(f4, g3);
++    h7 += fe25519_mul32x32(f5, g2);
++    h7 += fe25519_mul32x32(f6, g1);
++    h7 += fe25519_mul32x32(f7, g0);
++    h7 += fe25519_mul32x32(f8, g9_19);
++    h7 += fe25519_mul32x32(f9, g8_19);
++    int64_t h8 = fe25519_mul32x32(f0, g8);
++    h8 += fe25519_mul32x32(f1_2, g7);
++    h8 += fe25519_mul32x32(f2, g6);
++    h8 += fe25519_mul32x32(f3_2, g5);
++    h8 += fe25519_mul32x32(f4, g4);
++    h8 += fe25519_mul32x32(f5_2, g3);
++    h8 += fe25519_mul32x32(f6, g2);
++    h8 += fe25519_mul32x32(f7_2, g1);
++    h8 += fe25519_mul32x32(f8, g0);
++    h8 += fe25519_mul32x32(f9_2, g9_19);
++    int64_t h9 = fe25519_mul32x32(f0, g9);
++    h9 += fe25519_mul32x32(f1, g8);
++    h9 += fe25519_mul32x32(f2, g7);
++    h9 += fe25519_mul32x32(f3, g6);
++    h9 += fe25519_mul32x32(f4, g5);
++    h9 += fe25519_mul32x32(f5, g4);
++    h9 += fe25519_mul32x32(f6, g3);
++    h9 += fe25519_mul32x32(f7, g2);
++    h9 += fe25519_mul32x32(f8, g1);
++    h9 += fe25519_mul32x32(f9, g0);
++#else
+     int64_t f0g0    = f0 * (int64_t) g0;
+     int64_t f0g1    = f0 * (int64_t) g1;
+     int64_t f0g2    = f0 * (int64_t) g2;
+@@ -505,6 +633,7 @@ fe25519_mul(fe25519 h, const fe25519 f, const fe25519 g)
+                  f8g0 + f9g9_38;
+     int64_t h9 =
+         f0g9 + f1g8 + f2g7 + f3g6 + f4g5 + f5g4 + f6g3 + f7g2 + f8g1 + f9g0;
++#endif
+ 
+     int64_t carry0;
+     int64_t carry1;
+@@ -642,6 +771,63 @@ fe25519_sq(fe25519 h, const fe25519 f)
+     int32_t f8_19 = 19 * f8; /* 1.959375*2^30 */
+     int32_t f9_38 = 38 * f9; /* 1.959375*2^30 */
+ 
++#ifdef SODIUM_ESPHOME_ESP8266_PATHS
++    int64_t h0 = fe25519_mul32x32(f0, f0);
++    h0 += fe25519_mul32x32(f1_2, f9_38);
++    h0 += fe25519_mul32x32(f2_2, f8_19);
++    h0 += fe25519_mul32x32(f3_2, f7_38);
++    h0 += fe25519_mul32x32(f4_2, f6_19);
++    h0 += fe25519_mul32x32(f5, f5_38);
++    int64_t h1 = fe25519_mul32x32(f0_2, f1);
++    h1 += fe25519_mul32x32(f2, f9_38);
++    h1 += fe25519_mul32x32(f3_2, f8_19);
++    h1 += fe25519_mul32x32(f4, f7_38);
++    h1 += fe25519_mul32x32(f5_2, f6_19);
++    int64_t h2 = fe25519_mul32x32(f0_2, f2);
++    h2 += fe25519_mul32x32(f1_2, f1);
++    h2 += fe25519_mul32x32(f3_2, f9_38);
++    h2 += fe25519_mul32x32(f4_2, f8_19);
++    h2 += fe25519_mul32x32(f5_2, f7_38);
++    h2 += fe25519_mul32x32(f6, f6_19);
++    int64_t h3 = fe25519_mul32x32(f0_2, f3);
++    h3 += fe25519_mul32x32(f1_2, f2);
++    h3 += fe25519_mul32x32(f4, f9_38);
++    h3 += fe25519_mul32x32(f5_2, f8_19);
++    h3 += fe25519_mul32x32(f6, f7_38);
++    int64_t h4 = fe25519_mul32x32(f0_2, f4);
++    h4 += fe25519_mul32x32(f1_2, f3_2);
++    h4 += fe25519_mul32x32(f2, f2);
++    h4 += fe25519_mul32x32(f5_2, f9_38);
++    h4 += fe25519_mul32x32(f6_2, f8_19);
++    h4 += fe25519_mul32x32(f7, f7_38);
++    int64_t h5 = fe25519_mul32x32(f0_2, f5);
++    h5 += fe25519_mul32x32(f1_2, f4);
++    h5 += fe25519_mul32x32(f2_2, f3);
++    h5 += fe25519_mul32x32(f6, f9_38);
++    h5 += fe25519_mul32x32(f7_2, f8_19);
++    int64_t h6 = fe25519_mul32x32(f0_2, f6);
++    h6 += fe25519_mul32x32(f1_2, f5_2);
++    h6 += fe25519_mul32x32(f2_2, f4);
++    h6 += fe25519_mul32x32(f3_2, f3);
++    h6 += fe25519_mul32x32(f7_2, f9_38);
++    h6 += fe25519_mul32x32(f8, f8_19);
++    int64_t h7 = fe25519_mul32x32(f0_2, f7);
++    h7 += fe25519_mul32x32(f1_2, f6);
++    h7 += fe25519_mul32x32(f2_2, f5);
++    h7 += fe25519_mul32x32(f3_2, f4);
++    h7 += fe25519_mul32x32(f8, f9_38);
++    int64_t h8 = fe25519_mul32x32(f0_2, f8);
++    h8 += fe25519_mul32x32(f1_2, f7_2);
++    h8 += fe25519_mul32x32(f2_2, f6);
++    h8 += fe25519_mul32x32(f3_2, f5_2);
++    h8 += fe25519_mul32x32(f4, f4);
++    h8 += fe25519_mul32x32(f9, f9_38);
++    int64_t h9 = fe25519_mul32x32(f0_2, f9);
++    h9 += fe25519_mul32x32(f1_2, f8);
++    h9 += fe25519_mul32x32(f2_2, f7);
++    h9 += fe25519_mul32x32(f3_2, f6);
++    h9 += fe25519_mul32x32(f4_2, f5);
++#else
+     int64_t f0f0    = f0 * (int64_t) f0;
+     int64_t f0f1_2  = f0_2 * (int64_t) f1;
+     int64_t f0f2_2  = f0_2 * (int64_t) f2;
+@@ -708,6 +894,7 @@ fe25519_sq(fe25519 h, const fe25519 f)
+     int64_t h7 = f0f7_2 + f1f6_2 + f2f5_2 + f3f4_2 + f8f9_38;
+     int64_t h8 = f0f8_2 + f1f7_4 + f2f6_2 + f3f5_4 + f4f4 + f9f9_38;
+     int64_t h9 = f0f9_2 + f1f8_2 + f2f7_2 + f3f6_2 + f4f5_2;
++#endif
+ 
+     int64_t carry0;
+     int64_t carry1;
+@@ -814,6 +1001,63 @@ fe25519_sq2(fe25519 h, const fe25519 f)
+     int32_t f8_19 = 19 * f8; /* 1.959375*2^30 */
+     int32_t f9_38 = 38 * f9; /* 1.959375*2^30 */
+ 
++#ifdef SODIUM_ESPHOME_ESP8266_PATHS
++    int64_t h0 = fe25519_mul32x32(f0, f0);
++    h0 += fe25519_mul32x32(f1_2, f9_38);
++    h0 += fe25519_mul32x32(f2_2, f8_19);
++    h0 += fe25519_mul32x32(f3_2, f7_38);
++    h0 += fe25519_mul32x32(f4_2, f6_19);
++    h0 += fe25519_mul32x32(f5, f5_38);
++    int64_t h1 = fe25519_mul32x32(f0_2, f1);
++    h1 += fe25519_mul32x32(f2, f9_38);
++    h1 += fe25519_mul32x32(f3_2, f8_19);
++    h1 += fe25519_mul32x32(f4, f7_38);
++    h1 += fe25519_mul32x32(f5_2, f6_19);
++    int64_t h2 = fe25519_mul32x32(f0_2, f2);
++    h2 += fe25519_mul32x32(f1_2, f1);
++    h2 += fe25519_mul32x32(f3_2, f9_38);
++    h2 += fe25519_mul32x32(f4_2, f8_19);
++    h2 += fe25519_mul32x32(f5_2, f7_38);
++    h2 += fe25519_mul32x32(f6, f6_19);
++    int64_t h3 = fe25519_mul32x32(f0_2, f3);
++    h3 += fe25519_mul32x32(f1_2, f2);
++    h3 += fe25519_mul32x32(f4, f9_38);
++    h3 += fe25519_mul32x32(f5_2, f8_19);
++    h3 += fe25519_mul32x32(f6, f7_38);
++    int64_t h4 = fe25519_mul32x32(f0_2, f4);
++    h4 += fe25519_mul32x32(f1_2, f3_2);
++    h4 += fe25519_mul32x32(f2, f2);
++    h4 += fe25519_mul32x32(f5_2, f9_38);
++    h4 += fe25519_mul32x32(f6_2, f8_19);
++    h4 += fe25519_mul32x32(f7, f7_38);
++    int64_t h5 = fe25519_mul32x32(f0_2, f5);
++    h5 += fe25519_mul32x32(f1_2, f4);
++    h5 += fe25519_mul32x32(f2_2, f3);
++    h5 += fe25519_mul32x32(f6, f9_38);
++    h5 += fe25519_mul32x32(f7_2, f8_19);
++    int64_t h6 = fe25519_mul32x32(f0_2, f6);
++    h6 += fe25519_mul32x32(f1_2, f5_2);
++    h6 += fe25519_mul32x32(f2_2, f4);
++    h6 += fe25519_mul32x32(f3_2, f3);
++    h6 += fe25519_mul32x32(f7_2, f9_38);
++    h6 += fe25519_mul32x32(f8, f8_19);
++    int64_t h7 = fe25519_mul32x32(f0_2, f7);
++    h7 += fe25519_mul32x32(f1_2, f6);
++    h7 += fe25519_mul32x32(f2_2, f5);
++    h7 += fe25519_mul32x32(f3_2, f4);
++    h7 += fe25519_mul32x32(f8, f9_38);
++    int64_t h8 = fe25519_mul32x32(f0_2, f8);
++    h8 += fe25519_mul32x32(f1_2, f7_2);
++    h8 += fe25519_mul32x32(f2_2, f6);
++    h8 += fe25519_mul32x32(f3_2, f5_2);
++    h8 += fe25519_mul32x32(f4, f4);
++    h8 += fe25519_mul32x32(f9, f9_38);
++    int64_t h9 = fe25519_mul32x32(f0_2, f9);
++    h9 += fe25519_mul32x32(f1_2, f8);
++    h9 += fe25519_mul32x32(f2_2, f7);
++    h9 += fe25519_mul32x32(f3_2, f6);
++    h9 += fe25519_mul32x32(f4_2, f5);
++#else
+     int64_t f0f0    = f0 * (int64_t) f0;
+     int64_t f0f1_2  = f0_2 * (int64_t) f1;
+     int64_t f0f2_2  = f0_2 * (int64_t) f2;
+@@ -880,6 +1124,7 @@ fe25519_sq2(fe25519 h, const fe25519 f)
+     int64_t h7 = f0f7_2 + f1f6_2 + f2f5_2 + f3f4_2 + f8f9_38;
+     int64_t h8 = f0f8_2 + f1f7_4 + f2f6_2 + f3f5_4 + f4f4 + f9f9_38;
+     int64_t h9 = f0f9_2 + f1f8_2 + f2f7_2 + f3f6_2 + f4f5_2;
++#endif
+ 
+     int64_t carry0;
+     int64_t carry1;

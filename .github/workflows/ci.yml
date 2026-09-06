@@ -40,8 +40,17 @@ jobs:
             --cov-report=term-missing --cov-fail-under=100
 
   crypto-tests:
-    name: Crypto tests
+    name: Crypto tests (${{ matrix.name }})
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - name: reference
+            cflags: ""
+          # The ESP8266 only code (patches 08 and 09, port/x25519_m15.c)
+          # is compiled in and exercised on the host as well
+          - name: esp8266 code paths
+            cflags: "-DSODIUM_ESPHOME_TEST_ESP8266_PATHS"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -57,9 +66,9 @@ jobs:
 
       - name: Build library and tests
         run: |
-          cmake -B build -DCMAKE_BUILD_TYPE=Release .
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS="${{ matrix.cflags }}" .
           cmake --build build -j
-          gcc -O2 -Wall -Wextra -o build/kat tests/kat.c             -Ilibsodium/src/libsodium/include -Iport_include             build/libsodium.a
+          gcc -O2 -Wall -Wextra ${{ matrix.cflags }} -o build/kat tests/kat.c             -Ilibsodium/src/libsodium/include -Iport_include             build/libsodium.a
 
       - name: Run known-answer and differential tests
         run: ./build/kat

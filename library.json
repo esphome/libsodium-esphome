@@ -55,7 +55,8 @@
             "+<sodium/core.c>",
             "+<sodium/runtime.c>",
             "+<sodium/utils.c>",
-            "+<../../../port/version.c>"
+            "+<../../../port/version.c>",
+            "+<../../../port/x25519_m15.c>"
         ]
     }
 }
