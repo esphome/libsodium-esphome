@@ -42,6 +42,8 @@
 #include <stdint.h>
 #include <string.h>
 
+#include <sodium/utils.h>
+
 #include "sodium/esphome_yield.h"
 
 #define MUL15(x, y)   ((uint32_t)(x) * (uint32_t)(y))
@@ -966,18 +968,23 @@ int
 sodium_esphome_x25519_m15(unsigned char *q, const unsigned char *n,
                           const unsigned char *p)
 {
-	uint32_t x1[20], x2[20], z2[20], x3[20], z3[20];
-	uint32_t t1[20], t2[20], t3[20], t4[20];
+	/* One block so the scalar-derived state can be wiped in one call */
+	struct {
+		uint32_t x1[20], x2[20], z2[20], x3[20], z3[20];
+		uint32_t t1[20], t2[20], t3[20], t4[20];
+	} w;
+	uint32_t *x1 = w.x1, *x2 = w.x2, *z2 = w.z2, *x3 = w.x3, *z3 = w.z3;
+	uint32_t *t1 = w.t1, *t2 = w.t2, *t3 = w.t3, *t4 = w.t4;
 	uint32_t swap;
 	int i;
 
 	/* Bit 255 of the u coordinate is ignored; it lands in bit 8 of word 19 */
 	x1[19] = le8_to_le13(x1, p, 32) & 0xFF;
-	memcpy(x3, x1, sizeof x1);
-	memset(z2, 0, sizeof z2);
-	memset(x2, 0, sizeof x2);
+	memcpy(x3, x1, sizeof w.x1);
+	memset(z2, 0, sizeof w.z2);
+	memset(x2, 0, sizeof w.x2);
 	x2[0] = 1;
-	memset(z3, 0, sizeof z3);
+	memset(z3, 0, sizeof w.z3);
 	z3[0] = 1;
 
 	/*
@@ -1032,13 +1039,13 @@ sodium_esphome_x25519_m15(unsigned char *q, const unsigned char *n,
 	/*
 	 * Inverse of z2 by exponentiation (p - 2), as in BearSSL.
 	 */
-	memcpy(t1, z2, sizeof z2);
+	memcpy(t1, z2, sizeof w.z2);
 	for (i = 0; i < 15; i ++) {
 		SODIUM_ESP8266_YIELD();
 		f255_square(t1, t1);
 		f255_mul(t1, t1, z2);
 	}
-	memcpy(t2, t1, sizeof t1);
+	memcpy(t2, t1, sizeof w.t1);
 	for (i = 0; i < 14; i ++) {
 		int j;
 
@@ -1057,5 +1064,6 @@ sodium_esphome_x25519_m15(unsigned char *q, const unsigned char *n,
 	f255_mul(x2, x2, t2);
 	reduce_final_f255(x2);
 	le13_to_le8(q, 32, x2);
+	sodium_memzero(&w, sizeof w);
 	return 0;
 }

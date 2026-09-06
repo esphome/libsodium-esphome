@@ -295,9 +295,13 @@ static void test_x25519_differential(void)
     for (i = 0; i < 500; i++) {
         randombytes_buf(k, 32);
         randombytes_buf(u, 32);
+#ifndef SODIUM_ESPHOME_X25519_M15
+        /* the library's X25519 is ref10 here; in the ESP8266 build it is the
+           ladder itself, so the base point check below carries that build */
         check(sodium_esphome_x25519_m15(a, k, u) == 0 && crypto_scalarmult_curve25519(b, k, u) == 0 &&
                   memcmp(a, b, 32) == 0,
               "m15 ladder vs library X25519");
+#endif
         /* the base point multiply goes through the Edwards tables, an
            independent implementation of the same function */
         check(sodium_esphome_x25519_m15(a, k, x25519_basepoint) == 0 &&

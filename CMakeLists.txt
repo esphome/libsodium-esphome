@@ -33,7 +33,8 @@ set(LIBSODIUM_SRCS
   # Replaces upstream sodium/version.c, which cannot be used because including
   # its version.h on ESP8266 picks up the ESP SDK's version.h instead.
   "port/version.c"
-  # X25519 ladder used on ESP8266 (compiles to nothing elsewhere)
+  # X25519 ladder used on ESP8266; compiled but unreferenced elsewhere and
+  # dropped by --gc-sections
   "port/x25519_m15.c"
 )
 

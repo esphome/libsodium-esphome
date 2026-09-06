@@ -1,8 +1,8 @@
 diff --git a/src/libsodium/include/sodium/private/ed25519_ref10_fe_25_5.h b/src/libsodium/include/sodium/private/ed25519_ref10_fe_25_5.h
-index 4652f0d..2e7e1f5 100644
+index 4652f0d..5b122b1 100644
 --- a/src/libsodium/include/sodium/private/ed25519_ref10_fe_25_5.h
 +++ b/src/libsodium/include/sodium/private/ed25519_ref10_fe_25_5.h
-@@ -3,6 +3,33 @@
+@@ -3,6 +3,32 @@
  #include "private/common.h"
  #include "utils.h"
  
@@ -13,9 +13,9 @@ index 4652f0d..2e7e1f5 100644
 +   every int64 limb product below into a ROM __umulsidi3 call plus two mull
 +   for the sign cross terms; four 16-bit partial products are cheaper. The
 +   products are also summed into each output limb as they are formed
-+   (FE25519_ACCUMULATE) instead of being kept as 100 live int64 temporaries,
++   instead of being kept as 100 live int64 temporaries,
 +   which spill on a 16 register core. The integer sums are the same, so the
-+   results are bit identical to the reference code below. */
++   results are bit identical to the reference code kept below. */
 +static inline int64_t
 +fe25519_mul32x32(int32_t a, int32_t b)
 +{
@@ -24,23 +24,22 @@ index 4652f0d..2e7e1f5 100644
 +    uint32_t ll = al * bl, lh = al * bh, hl = ah * bl, hh = ah * bh;
 +    uint32_t mid = (ll >> 16) + (lh & 0xffff) + (hl & 0xffff);
 +    uint32_t hi = hh + (lh >> 16) + (hl >> 16) + (mid >> 16);
-+    uint32_t lo = ua * ub;
++    uint32_t lo = (mid << 16) | (ll & 0xffff);
 +
 +    /* a * b = ua * ub - (a < 0 ? ub << 32 : 0) - (b < 0 ? ua << 32 : 0) */
 +    hi -= (ub & (uint32_t) (a >> 31)) + (ua & (uint32_t) (b >> 31));
 +    return (int64_t) (((uint64_t) hi << 32) | lo);
 +}
-+#define FE25519_ACCUMULATE 1
 +#endif
 +
  /*
   h = 0
   */
-@@ -384,6 +411,108 @@ fe25519_mul(fe25519 h, const fe25519 f, const fe25519 g)
+@@ -384,6 +410,108 @@ fe25519_mul(fe25519 h, const fe25519 f, const fe25519 g)
      int32_t f7_2  = 2 * f7;
      int32_t f9_2  = 2 * f9;
  
-+#ifdef FE25519_ACCUMULATE
++#ifdef SODIUM_ESPHOME_ESP8266_PATHS
 +    int64_t h0 = fe25519_mul32x32(f0, g0);
 +    h0 += fe25519_mul32x32(f1_2, g9_19);
 +    h0 += fe25519_mul32x32(f2, g8_19);
@@ -145,7 +144,7 @@ index 4652f0d..2e7e1f5 100644
      int64_t f0g0    = f0 * (int64_t) g0;
      int64_t f0g1    = f0 * (int64_t) g1;
      int64_t f0g2    = f0 * (int64_t) g2;
-@@ -505,6 +634,7 @@ fe25519_mul(fe25519 h, const fe25519 f, const fe25519 g)
+@@ -505,6 +633,7 @@ fe25519_mul(fe25519 h, const fe25519 f, const fe25519 g)
                   f8g0 + f9g9_38;
      int64_t h9 =
          f0g9 + f1g8 + f2g7 + f3g6 + f4g5 + f5g4 + f6g3 + f7g2 + f8g1 + f9g0;
@@ -153,11 +152,11 @@ index 4652f0d..2e7e1f5 100644
  
      int64_t carry0;
      int64_t carry1;
-@@ -642,6 +772,63 @@ fe25519_sq(fe25519 h, const fe25519 f)
+@@ -642,6 +771,63 @@ fe25519_sq(fe25519 h, const fe25519 f)
      int32_t f8_19 = 19 * f8; /* 1.959375*2^30 */
      int32_t f9_38 = 38 * f9; /* 1.959375*2^30 */
  
-+#ifdef FE25519_ACCUMULATE
++#ifdef SODIUM_ESPHOME_ESP8266_PATHS
 +    int64_t h0 = fe25519_mul32x32(f0, f0);
 +    h0 += fe25519_mul32x32(f1_2, f9_38);
 +    h0 += fe25519_mul32x32(f2_2, f8_19);
@@ -217,7 +216,7 @@ index 4652f0d..2e7e1f5 100644
      int64_t f0f0    = f0 * (int64_t) f0;
      int64_t f0f1_2  = f0_2 * (int64_t) f1;
      int64_t f0f2_2  = f0_2 * (int64_t) f2;
-@@ -708,6 +895,7 @@ fe25519_sq(fe25519 h, const fe25519 f)
+@@ -708,6 +894,7 @@ fe25519_sq(fe25519 h, const fe25519 f)
      int64_t h7 = f0f7_2 + f1f6_2 + f2f5_2 + f3f4_2 + f8f9_38;
      int64_t h8 = f0f8_2 + f1f7_4 + f2f6_2 + f3f5_4 + f4f4 + f9f9_38;
      int64_t h9 = f0f9_2 + f1f8_2 + f2f7_2 + f3f6_2 + f4f5_2;
@@ -225,11 +224,11 @@ index 4652f0d..2e7e1f5 100644
  
      int64_t carry0;
      int64_t carry1;
-@@ -814,6 +1002,63 @@ fe25519_sq2(fe25519 h, const fe25519 f)
+@@ -814,6 +1001,63 @@ fe25519_sq2(fe25519 h, const fe25519 f)
      int32_t f8_19 = 19 * f8; /* 1.959375*2^30 */
      int32_t f9_38 = 38 * f9; /* 1.959375*2^30 */
  
-+#ifdef FE25519_ACCUMULATE
++#ifdef SODIUM_ESPHOME_ESP8266_PATHS
 +    int64_t h0 = fe25519_mul32x32(f0, f0);
 +    h0 += fe25519_mul32x32(f1_2, f9_38);
 +    h0 += fe25519_mul32x32(f2_2, f8_19);
@@ -289,7 +288,7 @@ index 4652f0d..2e7e1f5 100644
      int64_t f0f0    = f0 * (int64_t) f0;
      int64_t f0f1_2  = f0_2 * (int64_t) f1;
      int64_t f0f2_2  = f0_2 * (int64_t) f2;
-@@ -880,6 +1125,7 @@ fe25519_sq2(fe25519 h, const fe25519 f)
+@@ -880,6 +1124,7 @@ fe25519_sq2(fe25519 h, const fe25519 f)
      int64_t h7 = f0f7_2 + f1f6_2 + f2f5_2 + f3f4_2 + f8f9_38;
      int64_t h8 = f0f8_2 + f1f7_4 + f2f6_2 + f3f5_4 + f4f4 + f9f9_38;
      int64_t h9 = f0f9_2 + f1f8_2 + f2f7_2 + f3f6_2 + f4f5_2;
