@@ -46,12 +46,13 @@
 
 #define MUL15(x, y)   ((uint32_t)(x) * (uint32_t)(y))
 
-#if BR_NO_ARITH_SHIFT
-#define ARSH(x, n)   (((uint32_t)(x) >> (n)) \
-                    | ((-((uint32_t)(x) >> 31)) << (32 - (n))))
-#else
-#define ARSH(x, n)   ((*(int32_t *)&(x)) >> (n))
-#endif
+/*
+ * Arithmetic right shift of a 32-bit word. BearSSL reads the word through
+ * an int32_t pointer; the value cast below has the same effect on every
+ * compiler this port targets (gcc and clang define the conversion as
+ * wrapping and the shift as arithmetic) without the type pun.
+ */
+#define ARSH(x, n)   (((int32_t)(x)) >> (n))
 
 /*
  * Copy src to dst when ctl is 1, leave dst untouched when ctl is 0,

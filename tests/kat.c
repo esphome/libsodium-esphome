@@ -274,7 +274,10 @@ static void test_x25519_vectors(x25519_fn fn, const char *name)
     memcpy(k, x25519_basepoint, 32);
     memcpy(u, x25519_basepoint, 32);
     for (i = 0; i < 1000; i++) {
-        fn(out, k, u);
+        if (fn(out, k, u) != 0) {
+            check(0, name);
+            return;
+        }
         memcpy(u, k, 32);
         memcpy(k, out, 32);
         if (i == 0) {
