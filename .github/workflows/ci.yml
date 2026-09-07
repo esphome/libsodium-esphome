@@ -74,7 +74,7 @@ jobs:
         run: ./build/kat
 
   # The targets are all 32-bit; an int32 overflow that a 64-bit compiler folds
-  # away only shows up here
+  # away only shows up here. linux/386 images run natively on the amd64 runner
   crypto-tests-32bit:
     name: Crypto tests, 32-bit x86 (${{ matrix.name }})
     runs-on: ubuntu-latest
@@ -96,22 +96,14 @@ jobs:
             git -C libsodium apply "../$f"
           done
 
-      - name: Set up 32-bit Alpine Linux
-        uses: jirutka/setup-alpine@ae3b3ddba35054804fc4a3507b519fa7e8152050 # v1.4.1
-        with:
-          arch: x86
-          branch: v3.22
-          packages: build-base cmake
-
-      - name: Build library and tests
+      - name: Build and run the tests as 32-bit x86
         run: |
-          cmake -B build32 -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS="${{ matrix.cflags }}" .
-          cmake --build build32 -j
-          gcc -O2 -Wall -Wextra ${{ matrix.cflags }} -o build32/kat tests/kat.c \
-            -Ilibsodium/src/libsodium/include -Iport_include \
-            build32/libsodium.a
-        shell: alpine.sh {0}
-
-      - name: Run known-answer and differential tests
-        run: ./build32/kat
-        shell: alpine.sh {0}
+          docker run --rm --platform linux/386 -v "$PWD:/src" -w /src \
+            -e CFLAGS="${{ matrix.cflags }}" alpine:3.22 sh -ec '
+              apk add --no-cache build-base cmake > /dev/null
+              gcc -dumpmachine
+              cmake -B /tmp/build -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS="$CFLAGS" .
+              cmake --build /tmp/build -j
+              gcc -O2 -Wall -Wextra $CFLAGS -o /tmp/build/kat tests/kat.c \
+                -Ilibsodium/src/libsodium/include -Iport_include /tmp/build/libsodium.a
+              /tmp/build/kat'
