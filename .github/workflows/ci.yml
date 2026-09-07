@@ -72,3 +72,46 @@ jobs:
 
       - name: Run known-answer and differential tests
         run: ./build/kat
+
+  # The targets are all 32-bit; an int32 overflow that a 64-bit compiler folds
+  # away only shows up here
+  crypto-tests-32bit:
+    name: Crypto tests, 32-bit x86 (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - name: reference
+            cflags: ""
+          - name: esp8266 code paths
+            cflags: "-DSODIUM_ESPHOME_TEST_ESP8266_PATHS"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: true
+
+      - name: Apply patches
+        run: |
+          for f in patches/*.patch; do
+            git -C libsodium apply "../$f"
+          done
+
+      - name: Set up 32-bit Alpine Linux
+        uses: jirutka/setup-alpine@ae3b3ddba35054804fc4a3507b519fa7e8152050 # v1.4.1
+        with:
+          arch: x86
+          branch: v3.22
+          packages: build-base cmake
+
+      - name: Build library and tests
+        run: |
+          cmake -B build32 -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS="${{ matrix.cflags }}" .
+          cmake --build build32 -j
+          gcc -O2 -Wall -Wextra ${{ matrix.cflags }} -o build32/kat tests/kat.c \
+            -Ilibsodium/src/libsodium/include -Iport_include \
+            build32/libsodium.a
+        shell: alpine.sh {0}
+
+      - name: Run known-answer and differential tests
+        run: ./build32/kat
+        shell: alpine.sh {0}
