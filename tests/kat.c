@@ -20,11 +20,13 @@
  * first); see .github/workflows/ci.yml.
  */
 
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 
 #include <sodium/crypto_aead_chacha20poly1305.h>
 #include <sodium/crypto_hash_sha256.h>
+#include <sodium/crypto_onetimeauth_poly1305.h>
 #include <sodium/crypto_scalarmult_curve25519.h>
 #include <sodium/crypto_stream_chacha20.h>
 #include <sodium/randombytes.h>
@@ -302,6 +304,130 @@ static void test_x25519_base_vectors(void)
           "base point multiply, RFC 7748 Bob");
 }
 
+
+/* RFC 8439 section 2.5.2 Poly1305 and section 2.8.2 AEAD vectors, and a
+   differential of the library's Poly1305 against a plain reference written
+   here with ordinary int64 products, so the ESP8266 product helper is checked
+   against something that does not use it */
+static const unsigned char poly_key[32] = {
+    0x85, 0xd6, 0xbe, 0x78, 0x57, 0x55, 0x6d, 0x33, 0x7f, 0x44, 0x52, 0xfe, 0x42, 0xd5, 0x06, 0xa8,
+    0x01, 0x03, 0x80, 0x8a, 0xfb, 0x0d, 0xb2, 0xfd, 0x4a, 0xbf, 0xf6, 0xaf, 0x41, 0x49, 0xf5, 0x1b
+};
+static const unsigned char poly_tag[16] = { 0xa8, 0x06, 0x1d, 0xc1, 0x30, 0x51, 0x36, 0xc6,
+                                            0xc2, 0x2b, 0x8b, 0xaf, 0x0c, 0x01, 0x27, 0xa9 };
+static const char poly_msg[] = "Cryptographic Forum Research Group";
+static const unsigned char aead_aad[12] = { 0x50, 0x51, 0x52, 0x53, 0xc0, 0xc1, 0xc2, 0xc3, 0xc4, 0xc5, 0xc6, 0xc7 };
+static const unsigned char aead_nonce[12] = { 0x07, 0, 0, 0, 0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47 };
+static const unsigned char aead_tag[16] = { 0x1a, 0xe1, 0x0b, 0x59, 0x4f, 0x09, 0xe2, 0x6a,
+                                            0x7e, 0x90, 0x2e, 0xcb, 0xd0, 0x60, 0x06, 0x91 };
+static const char aead_msg[] = "Ladies and Gentlemen of the class of '99: If I could offer you only one tip "
+                               "for the future, sunscreen would be it.";
+
+static uint32_t kat_load32_le(const unsigned char *p)
+{
+    return (uint32_t) p[0] | ((uint32_t) p[1] << 8) | ((uint32_t) p[2] << 16) | ((uint32_t) p[3] << 24);
+}
+
+static void kat_store32_le(unsigned char *p, uint32_t v)
+{
+    p[0] = (unsigned char) v;
+    p[1] = (unsigned char) (v >> 8);
+    p[2] = (unsigned char) (v >> 16);
+    p[3] = (unsigned char) (v >> 24);
+}
+
+/* reference Poly1305: 26-bit limbs, plain int64 products, one block at a time */
+static void ref_poly1305(unsigned char mac[16], const unsigned char *m, size_t len, const unsigned char key[32])
+{
+    uint32_t r0, r1, r2, r3, r4, s1, s2, s3, s4, h0 = 0, h1 = 0, h2 = 0, h3 = 0, h4 = 0, c, g0, g1, g2, g3, g4, mask;
+    uint64_t d0, d1, d2, d3, d4, f;
+    unsigned char block[16];
+    uint32_t t0 = kat_load32_le(key), t1 = kat_load32_le(key + 4), t2 = kat_load32_le(key + 8), t3 = kat_load32_le(key + 12);
+
+    r0 = t0 & 0x3ffffff;
+    r1 = ((t0 >> 26) | (t1 << 6)) & 0x3ffff03;
+    r2 = ((t1 >> 20) | (t2 << 12)) & 0x3ffc0ff;
+    r3 = ((t2 >> 14) | (t3 << 18)) & 0x3f03fff;
+    r4 = (t3 >> 8) & 0x00fffff;
+    s1 = r1 * 5; s2 = r2 * 5; s3 = r3 * 5; s4 = r4 * 5;
+    while (len > 0) {
+        size_t n = len < 16 ? len : 16;
+        uint32_t hibit = n == 16 ? (1U << 24) : 0;
+        memset(block, 0, 16);
+        memcpy(block, m, n);
+        if (n < 16) block[n] = 1;
+        h0 += kat_load32_le(block) & 0x3ffffff;
+        h1 += (kat_load32_le(block + 3) >> 2) & 0x3ffffff;
+        h2 += (kat_load32_le(block + 6) >> 4) & 0x3ffffff;
+        h3 += (kat_load32_le(block + 9) >> 6) & 0x3ffffff;
+        h4 += (kat_load32_le(block + 12) >> 8) | hibit;
+        d0 = (uint64_t) h0 * r0 + (uint64_t) h1 * s4 + (uint64_t) h2 * s3 + (uint64_t) h3 * s2 + (uint64_t) h4 * s1;
+        d1 = (uint64_t) h0 * r1 + (uint64_t) h1 * r0 + (uint64_t) h2 * s4 + (uint64_t) h3 * s3 + (uint64_t) h4 * s2;
+        d2 = (uint64_t) h0 * r2 + (uint64_t) h1 * r1 + (uint64_t) h2 * r0 + (uint64_t) h3 * s4 + (uint64_t) h4 * s3;
+        d3 = (uint64_t) h0 * r3 + (uint64_t) h1 * r2 + (uint64_t) h2 * r1 + (uint64_t) h3 * r0 + (uint64_t) h4 * s4;
+        d4 = (uint64_t) h0 * r4 + (uint64_t) h1 * r3 + (uint64_t) h2 * r2 + (uint64_t) h3 * r1 + (uint64_t) h4 * r0;
+        c = (uint32_t) (d0 >> 26); h0 = (uint32_t) d0 & 0x3ffffff; d1 += c;
+        c = (uint32_t) (d1 >> 26); h1 = (uint32_t) d1 & 0x3ffffff; d2 += c;
+        c = (uint32_t) (d2 >> 26); h2 = (uint32_t) d2 & 0x3ffffff; d3 += c;
+        c = (uint32_t) (d3 >> 26); h3 = (uint32_t) d3 & 0x3ffffff; d4 += c;
+        c = (uint32_t) (d4 >> 26); h4 = (uint32_t) d4 & 0x3ffffff; h0 += c * 5;
+        c = h0 >> 26; h0 &= 0x3ffffff; h1 += c;
+        m += n; len -= n;
+    }
+    c = h1 >> 26; h1 &= 0x3ffffff; h2 += c;
+    c = h2 >> 26; h2 &= 0x3ffffff; h3 += c;
+    c = h3 >> 26; h3 &= 0x3ffffff; h4 += c;
+    c = h4 >> 26; h4 &= 0x3ffffff; h0 += c * 5;
+    c = h0 >> 26; h0 &= 0x3ffffff; h1 += c;
+    g0 = h0 + 5; c = g0 >> 26; g0 &= 0x3ffffff;
+    g1 = h1 + c; c = g1 >> 26; g1 &= 0x3ffffff;
+    g2 = h2 + c; c = g2 >> 26; g2 &= 0x3ffffff;
+    g3 = h3 + c; c = g3 >> 26; g3 &= 0x3ffffff;
+    g4 = h4 + c - (1U << 26);
+    mask = (g4 >> 31) - 1;
+    g0 &= mask; g1 &= mask; g2 &= mask; g3 &= mask; g4 &= mask;
+    mask = ~mask;
+    h0 = (h0 & mask) | g0; h1 = (h1 & mask) | g1; h2 = (h2 & mask) | g2; h3 = (h3 & mask) | g3; h4 = (h4 & mask) | g4;
+    h0 = (h0 | (h1 << 26)) & 0xffffffff;
+    h1 = ((h1 >> 6) | (h2 << 20)) & 0xffffffff;
+    h2 = ((h2 >> 12) | (h3 << 14)) & 0xffffffff;
+    h3 = ((h3 >> 18) | (h4 << 8)) & 0xffffffff;
+    f = (uint64_t) h0 + kat_load32_le(key + 16); h0 = (uint32_t) f;
+    f = (uint64_t) h1 + kat_load32_le(key + 20) + (f >> 32); h1 = (uint32_t) f;
+    f = (uint64_t) h2 + kat_load32_le(key + 24) + (f >> 32); h2 = (uint32_t) f;
+    f = (uint64_t) h3 + kat_load32_le(key + 28) + (f >> 32); h3 = (uint32_t) f;
+    kat_store32_le(mac, h0); kat_store32_le(mac + 4, h1); kat_store32_le(mac + 8, h2); kat_store32_le(mac + 12, h3);
+}
+
+static void test_poly1305(void)
+{
+    unsigned char mac[16], ref[16], key[32], msg[300], key2[32], c[128];
+    unsigned long long maclen;
+    int i;
+
+    check(crypto_onetimeauth_poly1305(mac, (const unsigned char *) poly_msg, strlen(poly_msg), poly_key) == 0 &&
+              memcmp(mac, poly_tag, 16) == 0,
+          "RFC 8439 Poly1305 vector");
+    ref_poly1305(ref, (const unsigned char *) poly_msg, strlen(poly_msg), poly_key);
+    check(memcmp(ref, poly_tag, 16) == 0, "reference Poly1305 against the RFC 8439 vector");
+    for (i = 0; i < 32; i++) {
+        key2[i] = (unsigned char) (0x80 + i);
+    }
+    check(crypto_aead_chacha20poly1305_ietf_encrypt_detached(c, mac, &maclen, (const unsigned char *) aead_msg,
+                                                             strlen(aead_msg), aead_aad, sizeof aead_aad, NULL,
+                                                             aead_nonce, key2) == 0 &&
+              memcmp(mac, aead_tag, 16) == 0,
+          "RFC 8439 ChaCha20-Poly1305 AEAD vector");
+    for (i = 0; i < 2000; i++) {
+        size_t len = randombytes_uniform(sizeof msg + 1);
+        randombytes_buf(key, 32);
+        randombytes_buf(msg, sizeof msg);
+        crypto_onetimeauth_poly1305(mac, msg, len, key);
+        ref_poly1305(ref, msg, len, key);
+        check(memcmp(mac, ref, 16) == 0, "library Poly1305 vs reference on random input");
+    }
+}
+
 static void test_x25519_differential(void)
 {
     unsigned char k[32], u[32], a[32], b[32];
@@ -346,6 +472,7 @@ int main(void)
     test_x25519_base_vectors();
     test_x25519_differential();
 #ifdef SODIUM_ESPHOME_NOISE_FAST_PATH
+    test_poly1305();
     test_session_differential();
     test_session_counter_continuation();
     printf("session fast path exercised\n");

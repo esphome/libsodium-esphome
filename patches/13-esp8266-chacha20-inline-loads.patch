@@ -1,0 +1,35 @@
+diff --git a/src/libsodium/crypto_stream/chacha20/ref/chacha20_ref.c b/src/libsodium/crypto_stream/chacha20/ref/chacha20_ref.c
+index 84609a21..94e903fa 100644
+--- a/src/libsodium/crypto_stream/chacha20/ref/chacha20_ref.c
++++ b/src/libsodium/crypto_stream/chacha20/ref/chacha20_ref.c
+@@ -12,6 +12,30 @@
+ #include "core.h"
+ #include "crypto_stream_chacha20.h"
+ #include "private/common.h"
++
++#include "sodium/esphome_platform.h"
++#ifdef SODIUM_ESPHOME_ESP8266_PATHS
++/* ESPHome: the byte-wise loads and stores of the block loop are called 32
++   times per block and -Os leaves them out of line; keep them inline */
++static inline __attribute__((always_inline)) uint32_t
++chacha_load32_le(const unsigned char *p)
++{
++    return (uint32_t) p[0] | ((uint32_t) p[1] << 8) | ((uint32_t) p[2] << 16) | ((uint32_t) p[3] << 24);
++}
++
++static inline __attribute__((always_inline)) void
++chacha_store32_le(unsigned char *p, uint32_t v)
++{
++    p[0] = (unsigned char) v;
++    p[1] = (unsigned char) (v >> 8);
++    p[2] = (unsigned char) (v >> 16);
++    p[3] = (unsigned char) (v >> 24);
++}
++#undef LOAD32_LE
++#undef STORE32_LE
++#define LOAD32_LE(p) chacha_load32_le(p)
++#define STORE32_LE(p, v) chacha_store32_le((p), (v))
++#endif
+ #include "utils.h"
+ #include <stdint.h>
+ #include <sodium/sodium_esphome.h>

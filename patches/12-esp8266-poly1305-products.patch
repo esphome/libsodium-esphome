@@ -1,0 +1,86 @@
+diff --git a/src/libsodium/crypto_onetimeauth/poly1305/donna/poly1305_donna32.h b/src/libsodium/crypto_onetimeauth/poly1305/donna/poly1305_donna32.h
+index be6b0218..7a9ad8b7 100644
+--- a/src/libsodium/crypto_onetimeauth/poly1305/donna/poly1305_donna32.h
++++ b/src/libsodium/crypto_onetimeauth/poly1305/donna/poly1305_donna32.h
+@@ -16,10 +16,44 @@
+ #endif
+ 
+ #include "private/common.h"
++#include "sodium/esphome_platform.h"
+ #include <stdint.h>
+ 
+ #define poly1305_block_size 16
+ 
++#ifdef SODIUM_ESPHOME_ESP8266_PATHS
++/* ESPHome: the LX106 has no 32x32->64 multiply, so each int64 product of the
++   block loop below is a ROM __umulsidi3 call; four 16-bit partial products
++   (mul16u) stay inline. Inputs are below 2^29, the sum of five fits in 64 bits
++   as before. The byte-wise loads of the block loop are kept inline as well,
++   -Os leaves the library ones out of line. */
++static inline __attribute__((always_inline)) unsigned long long
++poly1305_mul32x32(unsigned long a, unsigned long b)
++{
++    const uint32_t al = a & 0xffff, ah = a >> 16, bl = b & 0xffff, bh = b >> 16;
++    const uint32_t ll = (uint32_t) (uint16_t) al * (uint16_t) bl;
++    const uint32_t lh = (uint32_t) (uint16_t) al * (uint16_t) bh;
++    const uint32_t hl = (uint32_t) (uint16_t) ah * (uint16_t) bl;
++    const uint32_t hh = (uint32_t) (uint16_t) ah * (uint16_t) bh;
++    const uint32_t mid = (ll >> 16) + (lh & 0xffff) + (hl & 0xffff);
++    const uint32_t hi  = hh + (lh >> 16) + (hl >> 16) + (mid >> 16);
++    const uint32_t lo  = (mid << 16) | (ll & 0xffff);
++
++    return ((unsigned long long) hi << 32) | lo;
++}
++#define POLY1305_MUL(a, b) poly1305_mul32x32((a), (b))
++
++static inline __attribute__((always_inline)) uint32_t
++poly1305_load32_le(const unsigned char *p)
++{
++    return (uint32_t) p[0] | ((uint32_t) p[1] << 8) | ((uint32_t) p[2] << 16) | ((uint32_t) p[3] << 24);
++}
++#undef LOAD32_LE
++#define LOAD32_LE(p) poly1305_load32_le(p)
++#else
++#define POLY1305_MUL(a, b) ((unsigned long long) (a) * (b))
++#endif
++
+ /* 17 + sizeof(unsigned long long) + 14*sizeof(unsigned long) */
+ typedef struct poly1305_state_internal_t {
+     unsigned long      r[5];
+@@ -150,21 +184,21 @@ poly1305_blocks(poly1305_state_internal_t *st, const unsigned char *m,
+         }
+ 
+         /* h *= r */
+-        d0 = ((unsigned long long) h0 * r0) + ((unsigned long long) h1 * s4) +
+-             ((unsigned long long) h2 * s3) + ((unsigned long long) h3 * s2) +
+-             ((unsigned long long) h4 * s1);
+-        d1 = ((unsigned long long) h0 * r1) + ((unsigned long long) h1 * r0) +
+-             ((unsigned long long) h2 * s4) + ((unsigned long long) h3 * s3) +
+-             ((unsigned long long) h4 * s2);
+-        d2 = ((unsigned long long) h0 * r2) + ((unsigned long long) h1 * r1) +
+-             ((unsigned long long) h2 * r0) + ((unsigned long long) h3 * s4) +
+-             ((unsigned long long) h4 * s3);
+-        d3 = ((unsigned long long) h0 * r3) + ((unsigned long long) h1 * r2) +
+-             ((unsigned long long) h2 * r1) + ((unsigned long long) h3 * r0) +
+-             ((unsigned long long) h4 * s4);
+-        d4 = ((unsigned long long) h0 * r4) + ((unsigned long long) h1 * r3) +
+-             ((unsigned long long) h2 * r2) + ((unsigned long long) h3 * r1) +
+-             ((unsigned long long) h4 * r0);
++        d0 = POLY1305_MUL(h0, r0) + POLY1305_MUL(h1, s4) +
++             POLY1305_MUL(h2, s3) + POLY1305_MUL(h3, s2) +
++             POLY1305_MUL(h4, s1);
++        d1 = POLY1305_MUL(h0, r1) + POLY1305_MUL(h1, r0) +
++             POLY1305_MUL(h2, s4) + POLY1305_MUL(h3, s3) +
++             POLY1305_MUL(h4, s2);
++        d2 = POLY1305_MUL(h0, r2) + POLY1305_MUL(h1, r1) +
++             POLY1305_MUL(h2, r0) + POLY1305_MUL(h3, s4) +
++             POLY1305_MUL(h4, s3);
++        d3 = POLY1305_MUL(h0, r3) + POLY1305_MUL(h1, r2) +
++             POLY1305_MUL(h2, r1) + POLY1305_MUL(h3, r0) +
++             POLY1305_MUL(h4, s4);
++        d4 = POLY1305_MUL(h0, r4) + POLY1305_MUL(h1, r3) +
++             POLY1305_MUL(h2, r2) + POLY1305_MUL(h3, r1) +
++             POLY1305_MUL(h4, r0);
+ 
+         /* (partial) h %= p */
+         c  = (unsigned long) (d0 >> 26);
