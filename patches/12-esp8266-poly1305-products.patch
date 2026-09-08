@@ -1,8 +1,8 @@
 diff --git a/src/libsodium/crypto_onetimeauth/poly1305/donna/poly1305_donna32.h b/src/libsodium/crypto_onetimeauth/poly1305/donna/poly1305_donna32.h
-index be6b0218..f8859d61 100644
+index be6b0218..d8ee9517 100644
 --- a/src/libsodium/crypto_onetimeauth/poly1305/donna/poly1305_donna32.h
 +++ b/src/libsodium/crypto_onetimeauth/poly1305/donna/poly1305_donna32.h
-@@ -16,10 +16,44 @@
+@@ -16,10 +16,38 @@
  #endif
  
  #include "private/common.h"
@@ -15,8 +15,8 @@ index be6b0218..f8859d61 100644
 +/* ESPHome: the LX106 has no 32x32->64 multiply, so each int64 product of the
 +   block loop below is a ROM __umulsidi3 call; four 16-bit partial products
 +   (mul16u) stay inline. Inputs are below 2^29, the sum of five fits in 64 bits
-+   as before. The byte-wise loads of the block loop are kept inline as well,
-+   -Os leaves the library ones out of line. */
++   as before. The byte-wise loads of the block loop use the inline helper
++   from esphome_platform.h; -Os leaves the library ones out of line. */
 +static inline __attribute__((always_inline)) unsigned long long
 +poly1305_mul32x32(unsigned long a, unsigned long b)
 +{
@@ -32,13 +32,7 @@ index be6b0218..f8859d61 100644
 +    return ((unsigned long long) hi << 32) | lo;
 +}
 +#define POLY1305_MUL(a, b) poly1305_mul32x32((a), (b))
-+
-+static inline __attribute__((always_inline)) uint32_t
-+poly1305_load32_le(const unsigned char *p)
-+{
-+    return (uint32_t) p[0] | ((uint32_t) p[1] << 8) | ((uint32_t) p[2] << 16) | ((uint32_t) p[3] << 24);
-+}
-+#define POLY1305_LOAD32_LE(p) poly1305_load32_le(p)
++#define POLY1305_LOAD32_LE(p) sodium_esphome_load32_le(p)
 +#else
 +#define POLY1305_MUL(a, b) ((unsigned long long) (a) * (b))
 +#define POLY1305_LOAD32_LE(p) LOAD32_LE(p)
@@ -47,7 +41,7 @@ index be6b0218..f8859d61 100644
  /* 17 + sizeof(unsigned long long) + 14*sizeof(unsigned long) */
  typedef struct poly1305_state_internal_t {
      unsigned long      r[5];
-@@ -68,17 +102,17 @@ poly1305_init(poly1305_state_internal_t *st, const unsigned char key[32])
+@@ -68,17 +96,17 @@ poly1305_init(poly1305_state_internal_t *st, const unsigned char key[32])
          st->pad[2] = load32_le_aligned(&key[24]);
          st->pad[3] = load32_le_aligned(&key[28]);
      } else {
@@ -74,7 +68,7 @@ index be6b0218..f8859d61 100644
      }
  
      /* h = 0 */
-@@ -142,29 +176,29 @@ poly1305_blocks(poly1305_state_internal_t *st, const unsigned char *m,
+@@ -142,29 +170,29 @@ poly1305_blocks(poly1305_state_internal_t *st, const unsigned char *m,
              h3 += ((w2 >> 14) | (w3 << 18)) & 0x3ffffff;
              h4 += (w3 >> 8) | hibit;
          } else {
