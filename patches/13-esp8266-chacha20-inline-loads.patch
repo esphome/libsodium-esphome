@@ -1,14 +1,15 @@
 diff --git a/src/libsodium/crypto_stream/chacha20/ref/chacha20_ref.c b/src/libsodium/crypto_stream/chacha20/ref/chacha20_ref.c
-index 84609a21..94e903fa 100644
+index 84609a21..829b36aa 100644
 --- a/src/libsodium/crypto_stream/chacha20/ref/chacha20_ref.c
 +++ b/src/libsodium/crypto_stream/chacha20/ref/chacha20_ref.c
-@@ -12,6 +12,30 @@
+@@ -12,6 +12,31 @@
  #include "core.h"
  #include "crypto_stream_chacha20.h"
  #include "private/common.h"
 +
 +#include "sodium/esphome_platform.h"
 +#ifdef SODIUM_ESPHOME_ESP8266_PATHS
++#include <stdint.h>
 +/* ESPHome: the byte-wise loads and stores of the block loop are called 32
 +   times per block and -Os leaves them out of line; keep them inline */
 +static inline __attribute__((always_inline)) uint32_t

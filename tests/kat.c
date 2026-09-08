@@ -478,8 +478,8 @@ int main(void)
     test_x25519_vectors(sodium_esphome_x25519_m15, "m15 ladder RFC 7748 vectors");
     test_x25519_base_vectors();
     test_x25519_differential();
-#ifdef SODIUM_ESPHOME_NOISE_FAST_PATH
     test_poly1305();
+#ifdef SODIUM_ESPHOME_NOISE_FAST_PATH
     test_session_differential();
     test_session_counter_continuation();
     printf("session fast path exercised\n");
