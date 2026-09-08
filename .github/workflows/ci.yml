@@ -56,22 +56,14 @@ jobs:
         with:
           submodules: true
 
-      - name: Apply patches
-        run: |
-          for f in patches/*.patch; do
-            echo "Checking $f"
-            git -C libsodium apply --check "../$f"
-            git -C libsodium apply "../$f"
-          done
+      - name: Apply the patches, build and run the known-answer and differential tests
+        run: tests/run_kat.sh build "${{ matrix.cflags }}"
 
       - name: Check the packed base point table is reproducible
         run: |
           python3 .github/scripts/gen_base_packed.py \
             libsodium/src/libsodium/crypto_core/ed25519/ref10/fe_25_5/base.h /tmp/base_packed.h
           diff -u libsodium/src/libsodium/crypto_core/ed25519/ref10/base_packed.h /tmp/base_packed.h
-
-      - name: Build and run the known-answer and differential tests
-        run: tests/run_kat.sh build "${{ matrix.cflags }}"
 
   # The targets are all 32-bit; an int32 overflow that a 64-bit compiler folds
   # away only shows up here. linux/386 images run natively on the amd64 runner
@@ -90,17 +82,16 @@ jobs:
         with:
           submodules: true
 
-      - name: Apply patches
-        run: |
-          for f in patches/*.patch; do
-            echo "Checking $f"
-            git -C libsodium apply --check "../$f"
-            git -C libsodium apply "../$f"
-          done
-
       - name: Build and run the tests as 32-bit x86
         run: |
           docker run --rm --platform linux/386 -v "$PWD:/src" -w /src \
             -e CFLAGS="${{ matrix.cflags }}" \
             alpine:3.22@sha256:14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce \
-            sh -ec 'apk add --no-cache build-base cmake > /dev/null && gcc -dumpmachine && tests/run_kat.sh /tmp/build "$CFLAGS"'
+            sh -ec '
+              apk add --no-cache build-base cmake git > /dev/null
+              case "$(gcc -dumpmachine)" in
+                i?86-*) echo "32-bit x86 toolchain: $(gcc -dumpmachine)" ;;
+                *) echo "expected a 32-bit x86 toolchain, got $(gcc -dumpmachine)"; exit 1 ;;
+              esac
+              git config --global --add safe.directory "*"
+              tests/run_kat.sh /tmp/build "$CFLAGS"'
