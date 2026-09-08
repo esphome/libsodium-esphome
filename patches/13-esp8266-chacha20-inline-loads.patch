@@ -1,8 +1,8 @@
 diff --git a/src/libsodium/crypto_stream/chacha20/ref/chacha20_ref.c b/src/libsodium/crypto_stream/chacha20/ref/chacha20_ref.c
-index 84609a21..829b36aa 100644
+index 84609a21..1f51d1b4 100644
 --- a/src/libsodium/crypto_stream/chacha20/ref/chacha20_ref.c
 +++ b/src/libsodium/crypto_stream/chacha20/ref/chacha20_ref.c
-@@ -12,6 +12,31 @@
+@@ -12,6 +12,33 @@
  #include "core.h"
  #include "crypto_stream_chacha20.h"
  #include "private/common.h"
@@ -26,6 +26,8 @@ index 84609a21..829b36aa 100644
 +    p[2] = (unsigned char) (v >> 16);
 +    p[3] = (unsigned char) (v >> 24);
 +}
++/* deliberately shadows the library macros for the whole file: the block
++   loop has 32 call sites and they are the only users in this file */
 +#undef LOAD32_LE
 +#undef STORE32_LE
 +#define LOAD32_LE(p) chacha_load32_le(p)

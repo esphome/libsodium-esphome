@@ -105,18 +105,18 @@ static void test_rfc8439_kat(void)
 static void test_session_differential(void)
 {
     static const size_t adlens[] = { 0, 1, 12, 15, 16, 17, 40 };
-    unsigned char m[131];
+    unsigned char m[134];
     unsigned char ad[40];
     unsigned char ref_c[131];
     unsigned char ref_mac[16];
-    unsigned char fast_c[131];
+    unsigned char fast_c[134];
     unsigned char fast_mac[16];
     unsigned char block0[64];
     unsigned char npub[12];
     unsigned long long maclen;
     crypto_stream_chacha20_ietf_session_state st;
     uint64_t nonce64;
-    size_t clen, a, i;
+    size_t clen, a, i, off;
     char what[64];
 
     for (i = 0; i < sizeof m; i++) {
@@ -134,22 +134,26 @@ static void test_session_differential(void)
 
     crypto_stream_chacha20_ietf_session_init(&st, kat_key);
 
-    for (clen = 0; clen <= 130; clen++) {
-        for (a = 0; a < sizeof adlens / sizeof adlens[0]; a++) {
-            crypto_aead_chacha20poly1305_ietf_encrypt_detached(
-                ref_c, ref_mac, &maclen, m, clen,
-                adlens[a] ? ad : NULL, adlens[a], NULL, npub, kat_key);
+    /* every offset modulo 4 for the message and the ciphertext, so the
+       unaligned load and store paths of the block loops run too */
+    for (off = 0; off < 4; off++) {
+        for (clen = 0; clen <= 130; clen++) {
+            for (a = 0; a < sizeof adlens / sizeof adlens[0]; a++) {
+                crypto_aead_chacha20poly1305_ietf_encrypt_detached(
+                    ref_c, ref_mac, &maclen, m + off, clen,
+                    adlens[a] ? ad : NULL, adlens[a], NULL, npub, kat_key);
 
-            crypto_stream_chacha20_ietf_session_block0_xor(
-                &st, block0, fast_c, m, clen, nonce64);
-            crypto_onetimeauth_poly1305_aead_mac(
-                fast_mac, adlens[a] ? ad : NULL, adlens[a],
-                fast_c, clen, block0);
+                crypto_stream_chacha20_ietf_session_block0_xor(
+                    &st, block0, fast_c + off, m + off, clen, nonce64);
+                crypto_onetimeauth_poly1305_aead_mac(
+                    fast_mac, adlens[a] ? ad : NULL, adlens[a],
+                    fast_c + off, clen, block0);
 
-            snprintf(what, sizeof what, "differential clen=%zu adlen=%zu",
-                     clen, adlens[a]);
-            check(memcmp(ref_c, fast_c, clen) == 0 &&
-                  memcmp(ref_mac, fast_mac, 16) == 0, what);
+                snprintf(what, sizeof what, "differential clen=%zu adlen=%zu off=%zu",
+                         clen, adlens[a], off);
+                check(memcmp(ref_c, fast_c + off, clen) == 0 &&
+                      memcmp(ref_mac, fast_mac, 16) == 0, what);
+            }
         }
     }
 }
@@ -305,10 +309,12 @@ static void test_x25519_base_vectors(void)
 }
 
 
-/* RFC 8439 section 2.5.2 Poly1305 and section 2.8.2 AEAD vectors, and a
-   differential of the library's Poly1305 against a plain reference written
-   here with ordinary int64 products, so the ESP8266 product helper is checked
-   against something that does not use it */
+/* RFC 8439 section 2.5.2 Poly1305 vector (the AEAD vector is checked in
+   test_rfc8439_kat above), and a differential of the library's Poly1305
+   against a plain reference written here with ordinary int64 products, so the
+   ESP8266 product helper is checked against something that does not use it.
+   The random inputs start at every offset modulo 4 so the unaligned block
+   loads, the path the API payload takes, run too. */
 static const unsigned char poly_key[32] = {
     0x85, 0xd6, 0xbe, 0x78, 0x57, 0x55, 0x6d, 0x33, 0x7f, 0x44, 0x52, 0xfe, 0x42, 0xd5, 0x06, 0xa8,
     0x01, 0x03, 0x80, 0x8a, 0xfb, 0x0d, 0xb2, 0xfd, 0x4a, 0xbf, 0xf6, 0xaf, 0x41, 0x49, 0xf5, 0x1b
@@ -316,13 +322,6 @@ static const unsigned char poly_key[32] = {
 static const unsigned char poly_tag[16] = { 0xa8, 0x06, 0x1d, 0xc1, 0x30, 0x51, 0x36, 0xc6,
                                             0xc2, 0x2b, 0x8b, 0xaf, 0x0c, 0x01, 0x27, 0xa9 };
 static const char poly_msg[] = "Cryptographic Forum Research Group";
-static const unsigned char aead_aad[12] = { 0x50, 0x51, 0x52, 0x53, 0xc0, 0xc1, 0xc2, 0xc3, 0xc4, 0xc5, 0xc6, 0xc7 };
-static const unsigned char aead_nonce[12] = { 0x07, 0, 0, 0, 0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47 };
-static const unsigned char aead_tag[16] = { 0x1a, 0xe1, 0x0b, 0x59, 0x4f, 0x09, 0xe2, 0x6a,
-                                            0x7e, 0x90, 0x2e, 0xcb, 0xd0, 0x60, 0x06, 0x91 };
-static const char aead_msg[] = "Ladies and Gentlemen of the class of '99: If I could offer you only one tip "
-                               "for the future, sunscreen would be it.";
-
 static uint32_t kat_load32_le(const unsigned char *p)
 {
     return (uint32_t) p[0] | ((uint32_t) p[1] << 8) | ((uint32_t) p[2] << 16) | ((uint32_t) p[3] << 24);
@@ -401,8 +400,7 @@ static void ref_poly1305(unsigned char mac[16], const unsigned char *m, size_t l
 
 static void test_poly1305(void)
 {
-    unsigned char mac[16], ref[16], key[32], msg[300], key2[32], c[128];
-    unsigned long long maclen;
+    unsigned char mac[16], ref[16], key[32], msg[300];
     int i;
 
     check(crypto_onetimeauth_poly1305(mac, (const unsigned char *) poly_msg, strlen(poly_msg), poly_key) == 0 &&
@@ -410,20 +408,13 @@ static void test_poly1305(void)
           "RFC 8439 Poly1305 vector");
     ref_poly1305(ref, (const unsigned char *) poly_msg, strlen(poly_msg), poly_key);
     check(memcmp(ref, poly_tag, 16) == 0, "reference Poly1305 against the RFC 8439 vector");
-    for (i = 0; i < 32; i++) {
-        key2[i] = (unsigned char) (0x80 + i);
-    }
-    check(crypto_aead_chacha20poly1305_ietf_encrypt_detached(c, mac, &maclen, (const unsigned char *) aead_msg,
-                                                             strlen(aead_msg), aead_aad, sizeof aead_aad, NULL,
-                                                             aead_nonce, key2) == 0 &&
-              maclen == 16 && memcmp(mac, aead_tag, 16) == 0,
-          "RFC 8439 ChaCha20-Poly1305 AEAD vector");
     for (i = 0; i < 2000; i++) {
-        size_t len = randombytes_uniform(sizeof msg + 1);
+        size_t off = (size_t) (i & 3);
+        size_t len = randombytes_uniform(sizeof msg - 3);
         randombytes_buf(key, 32);
         randombytes_buf(msg, sizeof msg);
-        ref_poly1305(ref, msg, len, key);
-        check(crypto_onetimeauth_poly1305(mac, msg, len, key) == 0 && memcmp(mac, ref, 16) == 0,
+        ref_poly1305(ref, msg + off, len, key);
+        check(crypto_onetimeauth_poly1305(mac, msg + off, len, key) == 0 && memcmp(mac, ref, 16) == 0,
               "library Poly1305 vs reference on random input");
     }
     printf("poly1305: RFC 8439 vectors and %d random differentials against the reference, "
