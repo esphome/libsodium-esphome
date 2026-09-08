@@ -287,6 +287,20 @@ static void test_x25519_vectors(x25519_fn fn, const char *name)
     check(memcmp(k, x25519_iter1000, 32) == 0, name);
 }
 
+/* the base point multiply is a separate implementation from the ladder (the
+   Edwards tables), so it gets the RFC 7748 public keys directly */
+static void test_x25519_base_vectors(void)
+{
+    unsigned char out[32];
+
+    check(crypto_scalarmult_curve25519_base(out, x25519_alice_priv) == 0 &&
+              memcmp(out, x25519_alice_pub, 32) == 0,
+          "base point multiply, RFC 7748 Alice");
+    check(crypto_scalarmult_curve25519_base(out, x25519_bob_priv) == 0 &&
+              memcmp(out, x25519_bob_pub, 32) == 0,
+          "base point multiply, RFC 7748 Bob");
+}
+
 static void test_x25519_differential(void)
 {
     unsigned char k[32], u[32], a[32], b[32];
@@ -328,6 +342,7 @@ int main(void)
     test_rfc8439_kat();
     test_x25519_vectors(crypto_scalarmult_curve25519, "library X25519 RFC 7748 vectors");
     test_x25519_vectors(sodium_esphome_x25519_m15, "m15 ladder RFC 7748 vectors");
+    test_x25519_base_vectors();
     test_x25519_differential();
 #ifdef SODIUM_ESPHOME_NOISE_FAST_PATH
     test_session_differential();

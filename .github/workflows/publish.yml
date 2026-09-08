@@ -22,11 +22,7 @@ jobs:
       - name: Install platformio
         run: pip install --upgrade platformio
       - name: Apply patches
-        run: |-
-          for f in patches/*.patch; do
-            echo "Applying patch $f"
-            git -C libsodium apply "../${f}"
-          done
+        run: patches/apply.sh
       - name: Create dist directory
         run: mkdir -p dist
       - name: Package library
@@ -52,11 +48,7 @@ jobs:
         with:
           submodules: true
       - name: Apply patches
-        run: |-
-          for f in patches/*.patch; do
-            echo "Applying patch $f"
-            git -C libsodium apply "../${f}"
-          done
+        run: patches/apply.sh
       - name: Publish package
         uses: espressif/upload-components-ci-action@2ce17d73e35473317c1419dbd4f007aacb593040 # v2.2.1
         with:
