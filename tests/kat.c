@@ -15,6 +15,11 @@
  *    library itself runs the ESP8266 code (patches 08 and 09), and with
  *    SODIUM_ESPHOME_TEST_NARROW_MUL the RP2040 arrangement (m15 ladder,
  *    reference field products), so the same vectors cover those builds too.
+ * 5. Poly1305 must reproduce the RFC 8439 vector, and the library's Poly1305
+ *    must agree with a reference written in this file with ordinary int64
+ *    products on random inputs at every message and key offset, so the
+ *    ESP8266 product helper and the byte-wise loads (patch 12) are checked
+ *    against code that uses neither.
  *
  * Build against the patched submodule (run pack.sh style patch application
  * first); see .github/workflows/ci.yml.
