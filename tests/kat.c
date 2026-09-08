@@ -139,6 +139,8 @@ static void test_session_differential(void)
        offset modulo 4, the reference always works on aligned buffers, so the
        byte-wise load and store paths of the block loops are checked against
        the aligned ones */
+    check((((uintptr_t) m_aligned | (uintptr_t) ref_c) & 3) == 0,
+          "reference buffers 4-byte aligned, the differential needs the aligned path");
     for (off = 0; off < 4; off++) {
         for (clen = 0; clen <= 130; clen++) {
             for (a = 0; a < sizeof adlens / sizeof adlens[0]; a++) {
@@ -404,7 +406,8 @@ static void ref_poly1305(unsigned char mac[16], const unsigned char *m, size_t l
 
 static void test_poly1305(void)
 {
-    unsigned char mac[16], ref[16], key[32], msg[300];
+    unsigned char mac[16], ref[16], keybuf[36], msg[300];
+    const unsigned char *key;
     int i;
 
     check(crypto_onetimeauth_poly1305(mac, (const unsigned char *) poly_msg, strlen(poly_msg), poly_key) == 0 &&
@@ -415,7 +418,9 @@ static void test_poly1305(void)
     for (i = 0; i < 2000; i++) {
         size_t off = (size_t) (i & 3);
         size_t len = randombytes_uniform(sizeof msg - 3);
-        randombytes_buf(key, 32);
+        /* the key at every offset too, for the unaligned branch of the init */
+        key = keybuf + ((i >> 2) & 3);
+        randombytes_buf(keybuf, sizeof keybuf);
         randombytes_buf(msg, sizeof msg);
         ref_poly1305(ref, msg + off, len, key);
         check(crypto_onetimeauth_poly1305(mac, msg + off, len, key) == 0 && memcmp(mac, ref, 16) == 0,
