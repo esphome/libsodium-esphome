@@ -416,15 +416,15 @@ static void test_poly1305(void)
     check(crypto_aead_chacha20poly1305_ietf_encrypt_detached(c, mac, &maclen, (const unsigned char *) aead_msg,
                                                              strlen(aead_msg), aead_aad, sizeof aead_aad, NULL,
                                                              aead_nonce, key2) == 0 &&
-              memcmp(mac, aead_tag, 16) == 0,
+              maclen == 16 && memcmp(mac, aead_tag, 16) == 0,
           "RFC 8439 ChaCha20-Poly1305 AEAD vector");
     for (i = 0; i < 2000; i++) {
         size_t len = randombytes_uniform(sizeof msg + 1);
         randombytes_buf(key, 32);
         randombytes_buf(msg, sizeof msg);
-        crypto_onetimeauth_poly1305(mac, msg, len, key);
         ref_poly1305(ref, msg, len, key);
-        check(memcmp(mac, ref, 16) == 0, "library Poly1305 vs reference on random input");
+        check(crypto_onetimeauth_poly1305(mac, msg, len, key) == 0 && memcmp(mac, ref, 16) == 0,
+              "library Poly1305 vs reference on random input");
     }
     printf("poly1305: RFC 8439 vectors and %d random differentials against the reference, "
 #ifdef SODIUM_ESPHOME_ESP8266_PATHS
