@@ -417,7 +417,7 @@ static void test_poly1305(void)
         check(crypto_onetimeauth_poly1305(mac, msg + off, len, key) == 0 && memcmp(mac, ref, 16) == 0,
               "library Poly1305 vs reference on random input");
     }
-    printf("poly1305: RFC 8439 vectors and %d random differentials against the reference, "
+    printf("poly1305: RFC 8439 vector and %d random differentials against the reference, "
 #ifdef SODIUM_ESPHOME_ESP8266_PATHS
            "ESP8266 product helper in the library\n",
 #else
