@@ -7,13 +7,16 @@
 set -eu
 build=$1
 cflags=${2:-}
-marker=libsodium/src/libsodium/include/sodium/sodium_esphome_patched.h
-if [ ! -f "$marker" ]; then
+# A pristine tree has no tracked changes; files the patches add can survive a
+# reset --hard, so they are cleaned before applying rather than trusted
+if git -C libsodium diff --quiet; then
+  git -C libsodium clean -fdq
   patches/apply.sh
 fi
-# the marker comes from patch 06 and the table from patch 10; without them
-# this would test the pristine library and none of the port
-test -f "$marker"
+if git -C libsodium diff --quiet; then
+  echo "libsodium is unpatched; run patches/apply.sh" >&2
+  exit 1
+fi
 test -f libsodium/src/libsodium/crypto_core/ed25519/ref10/base_packed.h
 cmake -B "$build" -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS="$cflags" .
 cmake --build "$build" -j
