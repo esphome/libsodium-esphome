@@ -1,0 +1,120 @@
+diff --git a/src/libsodium/crypto_onetimeauth/poly1305/donna/poly1305_donna32.h b/src/libsodium/crypto_onetimeauth/poly1305/donna/poly1305_donna32.h
+index be6b0218..d8ee9517 100644
+--- a/src/libsodium/crypto_onetimeauth/poly1305/donna/poly1305_donna32.h
++++ b/src/libsodium/crypto_onetimeauth/poly1305/donna/poly1305_donna32.h
+@@ -16,10 +16,38 @@
+ #endif
+ 
+ #include "private/common.h"
++#include "sodium/esphome_platform.h"
+ #include <stdint.h>
+ 
+ #define poly1305_block_size 16
+ 
++#ifdef SODIUM_ESPHOME_ESP8266_PATHS
++/* ESPHome: the LX106 has no 32x32->64 multiply, so each int64 product of the
++   block loop below is a ROM __umulsidi3 call; four 16-bit partial products
++   (mul16u) stay inline. Inputs are below 2^29, the sum of five fits in 64 bits
++   as before. The byte-wise loads of the block loop use the inline helper
++   from esphome_platform.h; -Os leaves the library ones out of line. */
++static inline __attribute__((always_inline)) unsigned long long
++poly1305_mul32x32(unsigned long a, unsigned long b)
++{
++    const uint32_t al = a & 0xffff, ah = a >> 16, bl = b & 0xffff, bh = b >> 16;
++    const uint32_t ll = (uint32_t) (uint16_t) al * (uint32_t) (uint16_t) bl;
++    const uint32_t lh = (uint32_t) (uint16_t) al * (uint32_t) (uint16_t) bh;
++    const uint32_t hl = (uint32_t) (uint16_t) ah * (uint32_t) (uint16_t) bl;
++    const uint32_t hh = (uint32_t) (uint16_t) ah * (uint32_t) (uint16_t) bh;
++    const uint32_t mid = (ll >> 16) + (lh & 0xffff) + (hl & 0xffff);
++    const uint32_t hi  = hh + (lh >> 16) + (hl >> 16) + (mid >> 16);
++    const uint32_t lo  = (mid << 16) | (ll & 0xffff);
++
++    return ((unsigned long long) hi << 32) | lo;
++}
++#define POLY1305_MUL(a, b) poly1305_mul32x32((a), (b))
++#define POLY1305_LOAD32_LE(p) sodium_esphome_load32_le(p)
++#else
++#define POLY1305_MUL(a, b) ((unsigned long long) (a) * (b))
++#define POLY1305_LOAD32_LE(p) LOAD32_LE(p)
++#endif
++
+ /* 17 + sizeof(unsigned long long) + 14*sizeof(unsigned long) */
+ typedef struct poly1305_state_internal_t {
+     unsigned long      r[5];
+@@ -68,17 +96,17 @@ poly1305_init(poly1305_state_internal_t *st, const unsigned char key[32])
+         st->pad[2] = load32_le_aligned(&key[24]);
+         st->pad[3] = load32_le_aligned(&key[28]);
+     } else {
+-        st->r[0] = (LOAD32_LE(&key[0])) & 0x3ffffff;
+-        st->r[1] = (LOAD32_LE(&key[3]) >> 2) & 0x3ffff03;
+-        st->r[2] = (LOAD32_LE(&key[6]) >> 4) & 0x3ffc0ff;
+-        st->r[3] = (LOAD32_LE(&key[9]) >> 6) & 0x3f03fff;
+-        st->r[4] = (LOAD32_LE(&key[12]) >> 8) & 0x00fffff;
++        st->r[0] = (POLY1305_LOAD32_LE(&key[0])) & 0x3ffffff;
++        st->r[1] = (POLY1305_LOAD32_LE(&key[3]) >> 2) & 0x3ffff03;
++        st->r[2] = (POLY1305_LOAD32_LE(&key[6]) >> 4) & 0x3ffc0ff;
++        st->r[3] = (POLY1305_LOAD32_LE(&key[9]) >> 6) & 0x3f03fff;
++        st->r[4] = (POLY1305_LOAD32_LE(&key[12]) >> 8) & 0x00fffff;
+ 
+         /* save pad for later */
+-        st->pad[0] = LOAD32_LE(&key[16]);
+-        st->pad[1] = LOAD32_LE(&key[20]);
+-        st->pad[2] = LOAD32_LE(&key[24]);
+-        st->pad[3] = LOAD32_LE(&key[28]);
++        st->pad[0] = POLY1305_LOAD32_LE(&key[16]);
++        st->pad[1] = POLY1305_LOAD32_LE(&key[20]);
++        st->pad[2] = POLY1305_LOAD32_LE(&key[24]);
++        st->pad[3] = POLY1305_LOAD32_LE(&key[28]);
+     }
+ 
+     /* h = 0 */
+@@ -142,29 +170,29 @@ poly1305_blocks(poly1305_state_internal_t *st, const unsigned char *m,
+             h3 += ((w2 >> 14) | (w3 << 18)) & 0x3ffffff;
+             h4 += (w3 >> 8) | hibit;
+         } else {
+-            h0 += (LOAD32_LE(m + 0)) & 0x3ffffff;
+-            h1 += (LOAD32_LE(m + 3) >> 2) & 0x3ffffff;
+-            h2 += (LOAD32_LE(m + 6) >> 4) & 0x3ffffff;
+-            h3 += (LOAD32_LE(m + 9) >> 6) & 0x3ffffff;
+-            h4 += (LOAD32_LE(m + 12) >> 8) | hibit;
++            h0 += (POLY1305_LOAD32_LE(m + 0)) & 0x3ffffff;
++            h1 += (POLY1305_LOAD32_LE(m + 3) >> 2) & 0x3ffffff;
++            h2 += (POLY1305_LOAD32_LE(m + 6) >> 4) & 0x3ffffff;
++            h3 += (POLY1305_LOAD32_LE(m + 9) >> 6) & 0x3ffffff;
++            h4 += (POLY1305_LOAD32_LE(m + 12) >> 8) | hibit;
+         }
+ 
+         /* h *= r */
+-        d0 = ((unsigned long long) h0 * r0) + ((unsigned long long) h1 * s4) +
+-             ((unsigned long long) h2 * s3) + ((unsigned long long) h3 * s2) +
+-             ((unsigned long long) h4 * s1);
+-        d1 = ((unsigned long long) h0 * r1) + ((unsigned long long) h1 * r0) +
+-             ((unsigned long long) h2 * s4) + ((unsigned long long) h3 * s3) +
+-             ((unsigned long long) h4 * s2);
+-        d2 = ((unsigned long long) h0 * r2) + ((unsigned long long) h1 * r1) +
+-             ((unsigned long long) h2 * r0) + ((unsigned long long) h3 * s4) +
+-             ((unsigned long long) h4 * s3);
+-        d3 = ((unsigned long long) h0 * r3) + ((unsigned long long) h1 * r2) +
+-             ((unsigned long long) h2 * r1) + ((unsigned long long) h3 * r0) +
+-             ((unsigned long long) h4 * s4);
+-        d4 = ((unsigned long long) h0 * r4) + ((unsigned long long) h1 * r3) +
+-             ((unsigned long long) h2 * r2) + ((unsigned long long) h3 * r1) +
+-             ((unsigned long long) h4 * r0);
++        d0 = POLY1305_MUL(h0, r0) + POLY1305_MUL(h1, s4) +
++             POLY1305_MUL(h2, s3) + POLY1305_MUL(h3, s2) +
++             POLY1305_MUL(h4, s1);
++        d1 = POLY1305_MUL(h0, r1) + POLY1305_MUL(h1, r0) +
++             POLY1305_MUL(h2, s4) + POLY1305_MUL(h3, s3) +
++             POLY1305_MUL(h4, s2);
++        d2 = POLY1305_MUL(h0, r2) + POLY1305_MUL(h1, r1) +
++             POLY1305_MUL(h2, r0) + POLY1305_MUL(h3, s4) +
++             POLY1305_MUL(h4, s3);
++        d3 = POLY1305_MUL(h0, r3) + POLY1305_MUL(h1, r2) +
++             POLY1305_MUL(h2, r1) + POLY1305_MUL(h3, r0) +
++             POLY1305_MUL(h4, s4);
++        d4 = POLY1305_MUL(h0, r4) + POLY1305_MUL(h1, r3) +
++             POLY1305_MUL(h2, r2) + POLY1305_MUL(h3, r1) +
++             POLY1305_MUL(h4, r0);
+ 
+         /* (partial) h %= p */
+         c  = (unsigned long) (d0 >> 26);

@@ -23,4 +23,25 @@
 #define SODIUM_ESPHOME_NARROW_MUL 1
 #endif
 
+#ifdef SODIUM_ESPHOME_ESP8266_PATHS
+#include <stdint.h>
+/* Byte-wise little endian access for the unaligned paths of the block loops
+   (patches 12 and 13); -Os leaves the library's out of line and the loops
+   call them dozens of times per block. */
+static inline __attribute__((always_inline)) uint32_t
+sodium_esphome_load32_le(const unsigned char *p)
+{
+    return (uint32_t) p[0] | ((uint32_t) p[1] << 8) | ((uint32_t) p[2] << 16) | ((uint32_t) p[3] << 24);
+}
+
+static inline __attribute__((always_inline)) void
+sodium_esphome_store32_le(unsigned char *p, uint32_t v)
+{
+    p[0] = (unsigned char) v;
+    p[1] = (unsigned char) (v >> 8);
+    p[2] = (unsigned char) (v >> 16);
+    p[3] = (unsigned char) (v >> 24);
+}
+#endif
+
 #endif
