@@ -36,6 +36,7 @@
 #include <sodium/crypto_stream_chacha20.h>
 #include <sodium/randombytes.h>
 
+#include <sodium/esphome_platform.h>
 #include <sodium/esphome_x25519_m15.h>
 
 #if defined(__has_include)
@@ -320,6 +321,29 @@ static void test_x25519_base_vectors(void)
 }
 
 
+static void test_x25519_differential(void)
+{
+    unsigned char k[32], u[32], a[32], b[32];
+    int i;
+
+    for (i = 0; i < 500; i++) {
+        randombytes_buf(k, 32);
+        randombytes_buf(u, 32);
+#ifndef SODIUM_ESPHOME_X25519_M15
+        /* the library's X25519 is ref10 here; in the m15 builds it is the
+           ladder itself, so the base point check below carries those */
+        check(sodium_esphome_x25519_m15(a, k, u) == 0 && crypto_scalarmult_curve25519(b, k, u) == 0 &&
+                  memcmp(a, b, 32) == 0,
+              "m15 ladder vs library X25519");
+#endif
+        /* the base point multiply goes through the Edwards tables, an
+           independent implementation of the same function */
+        check(sodium_esphome_x25519_m15(a, k, x25519_basepoint) == 0 &&
+                  crypto_scalarmult_curve25519_base(b, k) == 0 && memcmp(a, b, 32) == 0,
+              "m15 ladder vs library base point multiply");
+    }
+}
+
 /* RFC 8439 section 2.5.2 Poly1305 vector (the AEAD vector is checked in
    test_rfc8439_kat above), and a differential of the library's Poly1305
    against a plain reference written here with ordinary int64 products, so the
@@ -438,29 +462,6 @@ static void test_poly1305(void)
            "reference products in the library\n",
 #endif
            i);
-}
-
-static void test_x25519_differential(void)
-{
-    unsigned char k[32], u[32], a[32], b[32];
-    int i;
-
-    for (i = 0; i < 500; i++) {
-        randombytes_buf(k, 32);
-        randombytes_buf(u, 32);
-#ifndef SODIUM_ESPHOME_X25519_M15
-        /* the library's X25519 is ref10 here; in the m15 builds it is the
-           ladder itself, so the base point check below carries those */
-        check(sodium_esphome_x25519_m15(a, k, u) == 0 && crypto_scalarmult_curve25519(b, k, u) == 0 &&
-                  memcmp(a, b, 32) == 0,
-              "m15 ladder vs library X25519");
-#endif
-        /* the base point multiply goes through the Edwards tables, an
-           independent implementation of the same function */
-        check(sodium_esphome_x25519_m15(a, k, x25519_basepoint) == 0 &&
-                  crypto_scalarmult_curve25519_base(b, k) == 0 && memcmp(a, b, 32) == 0,
-              "m15 ladder vs library base point multiply");
-    }
 }
 
 int main(void)
