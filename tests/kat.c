@@ -426,6 +426,13 @@ static void test_poly1305(void)
         ref_poly1305(ref, msg, len, key);
         check(memcmp(mac, ref, 16) == 0, "library Poly1305 vs reference on random input");
     }
+    printf("poly1305: RFC 8439 vectors and %d random differentials against the reference, "
+#ifdef SODIUM_ESPHOME_ESP8266_PATHS
+           "ESP8266 product helper in the library\n",
+#else
+           "reference products in the library\n",
+#endif
+           i);
 }
 
 static void test_x25519_differential(void)
