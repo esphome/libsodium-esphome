@@ -40,7 +40,7 @@ jobs:
             --cov-report=term-missing --cov-fail-under=100
 
   crypto-tests:
-    name: Crypto tests ({{ matrix.name }})
+    name: Crypto tests (${{ matrix.name }})
     runs-on: ubuntu-latest
     strategy:
       matrix:
