@@ -4,12 +4,12 @@
 #include "sodium/esphome_platform.h"
 
 /* ESPHome port: variable-base X25519 ladder built on BearSSL's m15 field
-   arithmetic (port/x25519_m15.c). It replaces ref10's ladder on cores without
-   a 32x32->64 multiply, where every int64 limb product becomes a library
-   call: the ESP8266 and the Cortex-M0+ of the RP2040 (ARMv6-M). Cores with
-   the wide multiply, ESP32 and the RP2350's Cortex-M33 included, are faster
-   on ref10 and keep it; there the function is compiled but unused. */
-#if defined(SODIUM_ESPHOME_ESP8266_PATHS) || defined(__ARM_ARCH_6M__)
+   arithmetic (port/x25519_m15.c). It replaces ref10's ladder on the cores
+   without a 32x32->64 multiply that esphome_platform.h recognises (ESP8266,
+   Cortex-M0+). Cores with the wide multiply, ESP32 and the RP2350's
+   Cortex-M33 included, are faster on ref10 and keep it; there the function
+   is compiled but unused. */
+#ifdef SODIUM_ESPHOME_NARROW_MUL
 #define SODIUM_ESPHOME_X25519_M15 1
 #endif
 

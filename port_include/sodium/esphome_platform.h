@@ -14,4 +14,13 @@
 #define SODIUM_ESPHOME_ESP8266_PATHS 1
 #endif
 
+/* Cores with no 32x32->64 multiply, where every int64 limb product is a
+   library call: the LX106 (ESP8266) and the Cortex-M0+ (ARMv6-M, RP2040).
+   They get the m15 X25519 ladder; the host test build can ask for the same
+   arrangement with SODIUM_ESPHOME_TEST_NARROW_MUL. */
+#if defined(SODIUM_ESPHOME_ESP8266_PATHS) || defined(__ARM_ARCH_6M__) || \
+    defined(SODIUM_ESPHOME_TEST_NARROW_MUL)
+#define SODIUM_ESPHOME_NARROW_MUL 1
+#endif
+
 #endif

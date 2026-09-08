@@ -23,17 +23,18 @@
  */
 
 /*
- * X25519 for the ESP8266 using BearSSL's "m15" Curve25519 field arithmetic
- * (13-bit limbs, 32-bit products). The LX106 core has no 32x32->64 multiply,
- * so libsodium's ref10 ladder spends most of its time in software 64-bit
- * products; the m15 representation needs none. Only the variable-base ladder
- * lives here: the base point multiply keeps ref10's precomputed Edwards
- * tables, which beat a ladder even on this core.
+ * X25519 for cores without a 32x32->64 multiply (ESP8266, Cortex-M0+) using
+ * BearSSL's "m15" Curve25519 field arithmetic (13-bit limbs, 32-bit
+ * products). On those cores libsodium's ref10 ladder spends most of its time
+ * in software 64-bit products; the m15 representation needs none. Only the
+ * variable-base ladder lives here: the base point multiply keeps ref10's
+ * precomputed Edwards tables, which beat a ladder even on these cores.
  *
  * The field code is taken unchanged from BearSSL src/ec/ec_c25519_m15.c
  * (MIT, see above). The ladder takes the little endian X25519 scalar and
- * point directly, reuses temporaries to keep the stack small, and yields to
- * the ESP8266 SYS context once per iteration like the ref10 ladder does.
+ * point directly, reuses temporaries to keep the stack small, and on the
+ * ESP8266 yields to the SYS context once per iteration like the ref10
+ * ladder does (a no-op elsewhere).
  */
 
 #include "sodium/esphome_x25519_m15.h"
