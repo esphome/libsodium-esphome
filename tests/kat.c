@@ -9,11 +9,12 @@
  * 3. A block0-only call must leave the session counter so that a following
  *    session_xor produces the same ciphertext as the fused call.
  * 4. X25519 must reproduce the RFC 7748 vectors (including the iterated
- *    one), both through the library and through the ESP8266 m15 ladder in
+ *    one), both through the library and through the m15 ladder in
  *    port/x25519_m15.c, and the ladder must agree with the library on
  *    random inputs. Built with SODIUM_ESPHOME_TEST_ESP8266_PATHS the
- *    library itself runs the ESP8266 code (patches 08 and 09), so the same
- *    vectors cover that build too.
+ *    library itself runs the ESP8266 code (patches 08 and 09), and with
+ *    SODIUM_ESPHOME_TEST_NARROW_MUL the RP2040 arrangement (m15 ladder,
+ *    reference field products), so the same vectors cover those builds too.
  *
  * Build against the patched submodule (run pack.sh style patch application
  * first); see .github/workflows/ci.yml.
@@ -310,8 +311,8 @@ static void test_x25519_differential(void)
         randombytes_buf(k, 32);
         randombytes_buf(u, 32);
 #ifndef SODIUM_ESPHOME_X25519_M15
-        /* the library's X25519 is ref10 here; in the ESP8266 build it is the
-           ladder itself, so the base point check below carries that build */
+        /* the library's X25519 is ref10 here; in the m15 builds it is the
+           ladder itself, so the base point check below carries those */
         check(sodium_esphome_x25519_m15(a, k, u) == 0 && crypto_scalarmult_curve25519(b, k, u) == 0 &&
                   memcmp(a, b, 32) == 0,
               "m15 ladder vs library X25519");

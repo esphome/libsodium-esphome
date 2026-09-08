@@ -2,15 +2,16 @@ diff --git a/src/libsodium/crypto_scalarmult/curve25519/ref10/x25519_ref10.c b/s
 index aa4f9f4..ad0a80e 100644
 --- a/src/libsodium/crypto_scalarmult/curve25519/ref10/x25519_ref10.c
 +++ b/src/libsodium/crypto_scalarmult/curve25519/ref10/x25519_ref10.c
-@@ -9,7 +9,12 @@
+@@ -9,7 +9,13 @@
  #include "x25519_ref10.h"
  
  #include "sodium/esphome_yield.h"
 +#include "sodium/esphome_x25519_m15.h"
  
-+/* ESPHome ESP8266 port: the ladder below is replaced by the m15 one in
-+   port/x25519_m15.c. The small order blacklist goes with it; the wrapper in
-+   scalarmult_curve25519.c rejects the all zero output such points produce. */
++/* ESPHome port: on cores without a 32x32->64 multiply the ladder below is
++   replaced by the m15 one in port/x25519_m15.c. The small order blacklist
++   goes with it; the wrapper in scalarmult_curve25519.c rejects the all zero
++   output such points produce. */
 +#ifndef SODIUM_ESPHOME_X25519_M15
  /*
   * Reject small order points early to mitigate the implications of
