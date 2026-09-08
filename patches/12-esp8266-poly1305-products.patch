@@ -1,5 +1,5 @@
 diff --git a/src/libsodium/crypto_onetimeauth/poly1305/donna/poly1305_donna32.h b/src/libsodium/crypto_onetimeauth/poly1305/donna/poly1305_donna32.h
-index be6b0218..ef205d2a 100644
+index be6b0218..f8859d61 100644
 --- a/src/libsodium/crypto_onetimeauth/poly1305/donna/poly1305_donna32.h
 +++ b/src/libsodium/crypto_onetimeauth/poly1305/donna/poly1305_donna32.h
 @@ -16,10 +16,44 @@
@@ -21,10 +21,10 @@ index be6b0218..ef205d2a 100644
 +poly1305_mul32x32(unsigned long a, unsigned long b)
 +{
 +    const uint32_t al = a & 0xffff, ah = a >> 16, bl = b & 0xffff, bh = b >> 16;
-+    const uint32_t ll = (uint32_t) (uint16_t) al * (uint16_t) bl;
-+    const uint32_t lh = (uint32_t) (uint16_t) al * (uint16_t) bh;
-+    const uint32_t hl = (uint32_t) (uint16_t) ah * (uint16_t) bl;
-+    const uint32_t hh = (uint32_t) (uint16_t) ah * (uint16_t) bh;
++    const uint32_t ll = (uint32_t) (uint16_t) al * (uint32_t) (uint16_t) bl;
++    const uint32_t lh = (uint32_t) (uint16_t) al * (uint32_t) (uint16_t) bh;
++    const uint32_t hl = (uint32_t) (uint16_t) ah * (uint32_t) (uint16_t) bl;
++    const uint32_t hh = (uint32_t) (uint16_t) ah * (uint32_t) (uint16_t) bh;
 +    const uint32_t mid = (ll >> 16) + (lh & 0xffff) + (hl & 0xffff);
 +    const uint32_t hi  = hh + (lh >> 16) + (hl >> 16) + (mid >> 16);
 +    const uint32_t lo  = (mid << 16) | (ll & 0xffff);
