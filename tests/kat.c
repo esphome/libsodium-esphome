@@ -9,11 +9,12 @@
  * 3. A block0-only call must leave the session counter so that a following
  *    session_xor produces the same ciphertext as the fused call.
  * 4. X25519 must reproduce the RFC 7748 vectors (including the iterated
- *    one), both through the library and through the ESP8266 m15 ladder in
+ *    one), both through the library and through the m15 ladder in
  *    port/x25519_m15.c, and the ladder must agree with the library on
  *    random inputs. Built with SODIUM_ESPHOME_TEST_ESP8266_PATHS the
- *    library itself runs the ESP8266 code (patches 08 and 09), so the same
- *    vectors cover that build too.
+ *    library itself runs the ESP8266 code (patches 08 and 09), and with
+ *    SODIUM_ESPHOME_TEST_NARROW_MUL the RP2040 arrangement (m15 ladder,
+ *    reference field products), so the same vectors cover those builds too.
  *
  * Build against the patched submodule (run pack.sh style patch application
  * first); see .github/workflows/ci.yml.
