@@ -106,6 +106,7 @@ static void test_session_differential(void)
 {
     static const size_t adlens[] = { 0, 1, 12, 15, 16, 17, 40 };
     unsigned char m[134];
+    unsigned char m_aligned[131];
     unsigned char ad[40];
     unsigned char ref_c[131];
     unsigned char ref_mac[16];
@@ -134,13 +135,16 @@ static void test_session_differential(void)
 
     crypto_stream_chacha20_ietf_session_init(&st, kat_key);
 
-    /* every offset modulo 4 for the message and the ciphertext, so the
-       unaligned load and store paths of the block loops run too */
+    /* the fast path sees the message and writes the ciphertext at every
+       offset modulo 4, the reference always works on aligned buffers, so the
+       byte-wise load and store paths of the block loops are checked against
+       the aligned ones */
     for (off = 0; off < 4; off++) {
         for (clen = 0; clen <= 130; clen++) {
             for (a = 0; a < sizeof adlens / sizeof adlens[0]; a++) {
+                memcpy(m_aligned, m + off, clen);
                 crypto_aead_chacha20poly1305_ietf_encrypt_detached(
-                    ref_c, ref_mac, &maclen, m + off, clen,
+                    ref_c, ref_mac, &maclen, m_aligned, clen,
                     adlens[a] ? ad : NULL, adlens[a], NULL, npub, kat_key);
 
                 crypto_stream_chacha20_ietf_session_block0_xor(
