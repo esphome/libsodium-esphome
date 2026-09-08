@@ -320,7 +320,6 @@ static void test_x25519_base_vectors(void)
           "base point multiply, RFC 7748 Bob");
 }
 
-
 static void test_x25519_differential(void)
 {
     unsigned char k[32], u[32], a[32], b[32];
