@@ -10,8 +10,6 @@ git -C libsodium clean -fd
 
 git submodule update --init
 
-for f in patches/*; do
-    git -C libsodium apply "../${f}"
-done
+patches/apply.sh
 
 pio package pack -o dist/

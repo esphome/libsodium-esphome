@@ -9,11 +9,7 @@ build=$1
 cflags=${2:-}
 marker=libsodium/src/libsodium/include/sodium/sodium_esphome_patched.h
 if [ ! -f "$marker" ]; then
-  for f in patches/*.patch; do
-    echo "Applying $f"
-    git -C libsodium apply --check "../$f"
-    git -C libsodium apply "../$f"
-  done
+  patches/apply.sh
 fi
 # the marker comes from patch 06 and the table from patch 10; without them
 # this would test the pristine library and none of the port
