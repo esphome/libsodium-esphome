@@ -106,9 +106,9 @@ static void test_session_differential(void)
 {
     static const size_t adlens[] = { 0, 1, 12, 15, 16, 17, 40 };
     unsigned char m[134];
-    unsigned char m_aligned[131];
+    unsigned char m_aligned[131] __attribute__((aligned(4)));
     unsigned char ad[40];
-    unsigned char ref_c[131];
+    unsigned char ref_c[131] __attribute__((aligned(4)));
     unsigned char ref_mac[16];
     unsigned char fast_c[134];
     unsigned char fast_mac[16];
