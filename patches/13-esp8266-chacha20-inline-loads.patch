@@ -1,8 +1,8 @@
 diff --git a/src/libsodium/crypto_stream/chacha20/ref/chacha20_ref.c b/src/libsodium/crypto_stream/chacha20/ref/chacha20_ref.c
-index 84609a21..a431ad4f 100644
+index 84609a21..2f626b4c 100644
 --- a/src/libsodium/crypto_stream/chacha20/ref/chacha20_ref.c
 +++ b/src/libsodium/crypto_stream/chacha20/ref/chacha20_ref.c
-@@ -12,6 +12,18 @@
+@@ -12,6 +12,19 @@
  #include "core.h"
  #include "crypto_stream_chacha20.h"
  #include "private/common.h"
@@ -11,8 +11,9 @@ index 84609a21..a431ad4f 100644
 +#ifdef SODIUM_ESPHOME_ESP8266_PATHS
 +/* ESPHome: the byte-wise loads and stores of the block loop are called 32
 +   times per block and -Os leaves them out of line; use the inline helpers.
-+   This deliberately shadows the library macros for the whole file: the
-+   block loop has 32 call sites and they are the only users in this file. */
++   This deliberately shadows the library macros for the whole file, so the
++   key and nonce setup pick up the same inline helpers (harmless, they run
++   once per session). */
 +#undef LOAD32_LE
 +#undef STORE32_LE
 +#define LOAD32_LE(p) sodium_esphome_load32_le(p)
