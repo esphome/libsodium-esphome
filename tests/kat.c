@@ -437,6 +437,7 @@ static void test_poly1305(void)
 {
     unsigned char mac[16], ref[16], keybuf[36], msg[300];
     const unsigned char *key;
+    char what[80];
     int i;
 
     check(crypto_onetimeauth_poly1305(mac, (const unsigned char *) poly_msg, strlen(poly_msg), poly_key) == 0 &&
@@ -452,8 +453,9 @@ static void test_poly1305(void)
         randombytes_buf(keybuf, sizeof keybuf);
         randombytes_buf(msg, sizeof msg);
         ref_poly1305(ref, msg + off, len, key);
-        check(crypto_onetimeauth_poly1305(mac, msg + off, len, key) == 0 && memcmp(mac, ref, 16) == 0,
-              "library Poly1305 vs reference on random input");
+        snprintf(what, sizeof what, "poly1305 vs reference len=%zu off=%zu keyoff=%zu", len, off,
+                 (size_t) ((i >> 2) & 3));
+        check(crypto_onetimeauth_poly1305(mac, msg + off, len, key) == 0 && memcmp(mac, ref, 16) == 0, what);
     }
     printf("poly1305: RFC 8439 vector and %d random differentials against the reference, "
 #ifdef SODIUM_ESPHOME_ESP8266_PATHS
