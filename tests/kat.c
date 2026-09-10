@@ -465,8 +465,8 @@ static void test_poly1305(void)
            i);
 }
 
-/* SHA256 must reproduce the FIPS 180-2 vectors; since patch 14 there is
-   one transform for every target, so the reference leg covers it */
+/* SHA256 must reproduce the FIPS 180-4 example vectors; since patch 14
+   there is one transform for every target, so the reference leg covers it */
 static void test_sha256(void)
 {
     static const unsigned char expected[32] = {
@@ -478,7 +478,7 @@ static void test_sha256(void)
     crypto_hash_sha256(out, (const unsigned char *) "abc", 3);
     check(memcmp(out, expected, 32) == 0, "sha256 known answer");
     /* Two blocks, so the state carries across a block boundary;
-       FIPS 180-2 example B.2 */
+       FIPS 180-4 example B.2 */
     static const unsigned char two_blocks[] =
         "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq";
     static const unsigned char expected2[32] = {
@@ -493,8 +493,8 @@ static void test_sha256(void)
 
 int main(void)
 {
-    /* FIPS 180-4 example: SHA-256("abc"). Guards the round constant table
-       patch 07 relocates on ESP8266. */
+    /* One and two block SHA256 vectors; guards the round constant table in
+       flash on the ESP8266 and the compact transform on every target */
     test_sha256();
 
     test_rfc8439_kat();
