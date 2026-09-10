@@ -23,6 +23,10 @@ extern "C" {
 int sodium_esphome_x25519_m15(unsigned char *q, const unsigned char *n,
                               const unsigned char *p);
 
+/* Base point multiply for the same cores: the ref10 walk over the packed
+   Edwards table, with the point arithmetic on the 13-bit limbs. */
+int sodium_esphome_x25519_m15_base(unsigned char *q, const unsigned char *n);
+
 #ifdef __cplusplus
 }
 #endif

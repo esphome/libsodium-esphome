@@ -315,6 +315,8 @@ static void test_x25519_vectors(x25519_fn fn, const char *name)
 static void test_x25519_base_vectors(void)
 {
     unsigned char out[32];
+    unsigned char k[32], a[32], b[32];
+    int i;
 
     check(crypto_scalarmult_curve25519_base(out, x25519_alice_priv) == 0 &&
               memcmp(out, x25519_alice_pub, 32) == 0,
@@ -322,6 +324,24 @@ static void test_x25519_base_vectors(void)
     check(crypto_scalarmult_curve25519_base(out, x25519_bob_priv) == 0 &&
               memcmp(out, x25519_bob_pub, 32) == 0,
           "base point multiply, RFC 7748 Bob");
+    /* the m15 base multiply: the vectors, then random scalars against the
+       ladder on u = 9, which shares nothing with the table walk */
+    check(sodium_esphome_x25519_m15_base(out, x25519_alice_priv) == 0 &&
+              memcmp(out, x25519_alice_pub, 32) == 0,
+          "m15 base point multiply, RFC 7748 Alice");
+    check(sodium_esphome_x25519_m15_base(out, x25519_bob_priv) == 0 &&
+              memcmp(out, x25519_bob_pub, 32) == 0,
+          "m15 base point multiply, RFC 7748 Bob");
+    for (i = 0; i < 200; i++) {
+        randombytes_buf(k, 32);
+        check(sodium_esphome_x25519_m15_base(a, k) == 0 &&
+                  sodium_esphome_x25519_m15(b, k, x25519_basepoint) == 0 &&
+                  memcmp(a, b, 32) == 0,
+              "m15 base point multiply vs the ladder on u = 9");
+        check(crypto_scalarmult_curve25519_base(b, k) == 0 && memcmp(a, b, 32) == 0,
+              "m15 base point multiply vs the library");
+    }
+    printf("x25519: m15 base point multiply agrees with the ladder and the library on 200 random scalars\n");
 }
 
 static void test_x25519_differential(void)

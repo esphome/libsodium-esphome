@@ -1,0 +1,15 @@
+diff --git a/src/libsodium/crypto_scalarmult/curve25519/ref10/x25519_ref10.c b/src/libsodium/crypto_scalarmult/curve25519/ref10/x25519_ref10.c
+index 22b6ef65..0d0bd63b 100644
+--- a/src/libsodium/crypto_scalarmult/curve25519/ref10/x25519_ref10.c
++++ b/src/libsodium/crypto_scalarmult/curve25519/ref10/x25519_ref10.c
+@@ -189,8 +189,9 @@ struct crypto_scalarmult_curve25519_implementation
+     crypto_scalarmult_curve25519_ref10_implementation = {
+ #ifdef SODIUM_ESPHOME_X25519_M15
+         SODIUM_C99(.mult =) sodium_esphome_x25519_m15,
++        SODIUM_C99(.mult_base =) sodium_esphome_x25519_m15_base
+ #else
+         SODIUM_C99(.mult =) crypto_scalarmult_curve25519_ref10,
+-#endif
+         SODIUM_C99(.mult_base =) crypto_scalarmult_curve25519_ref10_base
++#endif
+     };
