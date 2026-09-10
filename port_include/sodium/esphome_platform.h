@@ -24,6 +24,10 @@
 #endif
 
 #ifdef SODIUM_ESPHOME_ESP8266_PATHS
+/* One SHA256 round per loop pass instead of 64 unrolled (patch 14): about
+   1.4 KB less flash. A handshake hashes a few dozen short inputs and the
+   transport none, so the per block cost does not reach a connect. */
+#define SODIUM_ESPHOME_COMPACT_SHA256 1
 #include <stdint.h>
 /* Byte-wise little endian access for the unaligned paths of the block loops
    (patches 12 and 13); -Os leaves the library's out of line and the loops
