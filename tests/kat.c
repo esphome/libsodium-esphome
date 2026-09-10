@@ -43,6 +43,9 @@
 #include <sodium/esphome_platform.h>
 #include <sodium/esphome_x25519_m15.h>
 
+/* ref10's base multiply, the oracle for the m15 one; not in the public headers */
+int crypto_scalarmult_curve25519_ref10_base(unsigned char *q, const unsigned char *n);
+
 #if defined(__has_include)
 # if __has_include(<sodium/sodium_esphome.h>)
 #  include <sodium/sodium_esphome.h>
@@ -324,8 +327,10 @@ static void test_x25519_base_vectors(void)
     check(crypto_scalarmult_curve25519_base(out, x25519_bob_priv) == 0 &&
               memcmp(out, x25519_bob_pub, 32) == 0,
           "base point multiply, RFC 7748 Bob");
-    /* the m15 base multiply: the vectors, then random scalars against the
-       ladder on u = 9, which shares nothing with the table walk */
+    /* the m15 base multiply: the vectors, then random scalars byte for byte
+       against ref10's base multiply, which is compiled in every build even
+       where the dispatch no longer uses it, and against the ladder on u = 9,
+       which shares nothing with the table walk */
     check(sodium_esphome_x25519_m15_base(out, x25519_alice_priv) == 0 &&
               memcmp(out, x25519_alice_pub, 32) == 0,
           "m15 base point multiply, RFC 7748 Alice");
@@ -335,13 +340,16 @@ static void test_x25519_base_vectors(void)
     for (i = 0; i < 200; i++) {
         randombytes_buf(k, 32);
         check(sodium_esphome_x25519_m15_base(a, k) == 0 &&
-                  sodium_esphome_x25519_m15(b, k, x25519_basepoint) == 0 &&
+                  crypto_scalarmult_curve25519_ref10_base(b, k) == 0 &&
+                  memcmp(a, b, 32) == 0,
+              "m15 base point multiply vs ref10");
+        check(sodium_esphome_x25519_m15(b, k, x25519_basepoint) == 0 &&
                   memcmp(a, b, 32) == 0,
               "m15 base point multiply vs the ladder on u = 9");
         check(crypto_scalarmult_curve25519_base(b, k) == 0 && memcmp(a, b, 32) == 0,
               "m15 base point multiply vs the library");
     }
-    printf("x25519: m15 base point multiply agrees with the ladder and the library on 200 random scalars\n");
+    printf("x25519: m15 base point multiply byte identical to ref10, the ladder and the library on 200 random scalars\n");
 }
 
 static void test_x25519_differential(void)
