@@ -1,5 +1,5 @@
 diff --git a/src/libsodium/crypto_hash/sha256/cp/hash_sha256_cp.c b/src/libsodium/crypto_hash/sha256/cp/hash_sha256_cp.c
-index 832dabb9..dfeb4f14 100644
+index 832dabb9..3eddca21 100644
 --- a/src/libsodium/crypto_hash/sha256/cp/hash_sha256_cp.c
 +++ b/src/libsodium/crypto_hash/sha256/cp/hash_sha256_cp.c
 @@ -35,6 +35,7 @@
@@ -22,7 +22,7 @@ index 832dabb9..dfeb4f14 100644
      }
  }
  
-@@ -96,63 +101,50 @@ static const uint32_t SHA256_KRND_ATTR Krnd[64] = {
+@@ -96,63 +101,53 @@ static const uint32_t SHA256_KRND_ATTR Krnd[64] = {
      d += h;                            \
      h += S0(a) + Maj(a, b, c);
  
@@ -37,9 +37,12 @@ index 832dabb9..dfeb4f14 100644
 -
 +/* One round per pass with the working variables rotated by hand, and the
 +   message schedule filled in as the rounds reach it, in place of 64
-+   unrolled rounds: about 2.1 KB less flash. A Noise handshake hashes a few
-+   dozen short inputs and the transport none, so the per block cost does
-+   not reach a connect on any target. */
++   unrolled rounds: about 2 KB less flash on the ESP8266 (the transform
++   alone 2508 to 324 bytes). A Noise handshake hashes a few dozen short
++   inputs and the transport none, so the per block cost does not reach a
++   connect on any target. The working variables are locals here, so the
++   caller's sodium_memzero of its scratch no longer covers them; their
++   residue is the state difference, which the state object holds anyway. */
  static void
 -SHA256_Transform(uint32_t state[8], const uint8_t block[64], uint32_t W[64],
 -                 uint32_t S[8])
@@ -123,7 +126,7 @@ index 832dabb9..dfeb4f14 100644
  }
  
  static const uint8_t PAD[64] = { 0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-@@ -162,7 +154,7 @@ static const uint8_t PAD[64] = { 0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+@@ -162,7 +157,7 @@ static const uint8_t PAD[64] = { 0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                                   0,    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
  
  static void
@@ -132,7 +135,7 @@ index 832dabb9..dfeb4f14 100644
  {
      unsigned int r;
      unsigned int i;
-@@ -177,11 +169,11 @@ SHA256_Pad(crypto_hash_sha256_state *state, uint32_t tmp32[64 + 8])
+@@ -177,11 +172,11 @@ SHA256_Pad(crypto_hash_sha256_state *state, uint32_t tmp32[64 + 8])
          for (i = 0; i < 64 - r; i++) {
              state->buf[r + i] = PAD[i];
          }
@@ -146,7 +149,7 @@ index 832dabb9..dfeb4f14 100644
  }
  
  int
-@@ -202,7 +194,7 @@ int
+@@ -202,7 +197,7 @@ int
  crypto_hash_sha256_update(crypto_hash_sha256_state *state,
                            const unsigned char *in, unsigned long long inlen)
  {
@@ -155,7 +158,7 @@ index 832dabb9..dfeb4f14 100644
      unsigned long long i;
      unsigned long long r;
  
-@@ -222,12 +214,12 @@ crypto_hash_sha256_update(crypto_hash_sha256_state *state,
+@@ -222,12 +217,12 @@ crypto_hash_sha256_update(crypto_hash_sha256_state *state,
      for (i = 0; i < 64 - r; i++) {
          state->buf[r + i] = in[i];
      }
@@ -170,7 +173,7 @@ index 832dabb9..dfeb4f14 100644
          in += 64;
          inlen -= 64;
      }
-@@ -243,7 +235,7 @@ crypto_hash_sha256_update(crypto_hash_sha256_state *state,
+@@ -243,7 +238,7 @@ crypto_hash_sha256_update(crypto_hash_sha256_state *state,
  int
  crypto_hash_sha256_final(crypto_hash_sha256_state *state, unsigned char *out)
  {
