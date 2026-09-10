@@ -15,7 +15,7 @@ index 1a293cbb..0655c2a3 100644
  
  #include "sodium/esphome_yield.h"
 diff --git a/src/libsodium/include/sodium/private/ed25519_ref10_fe_25_5.h b/src/libsodium/include/sodium/private/ed25519_ref10_fe_25_5.h
-index 78c3f4a5..7274ad87 100644
+index 78c3f4a5..788b4ac6 100644
 --- a/src/libsodium/include/sodium/private/ed25519_ref10_fe_25_5.h
 +++ b/src/libsodium/include/sodium/private/ed25519_ref10_fe_25_5.h
 @@ -51,6 +51,40 @@ fe25519_1(fe25519 h)
@@ -23,10 +23,10 @@ index 78c3f4a5..7274ad87 100644
  }
  
 +/* ESPHome port: these four are defined once, by ed25519_ref10.c, instead of
-+   as a static copy in every file that includes this header; on the wide
-+   multiply targets that drops the copies x25519_ref10.c made. As new
-+   globals they carry the port prefix; the inline wrappers keep the
-+   upstream names at the call sites. */
++   as a static copy in every file that includes this header, which drops
++   the copies x25519_ref10.c made. As new globals they carry the port
++   prefix; the inline wrappers keep the upstream names at the call
++   sites. */
 +void sodium_esphome_fe25519_add(fe25519 h, const fe25519 f, const fe25519 g);
 +void sodium_esphome_fe25519_sub(fe25519 h, const fe25519 f, const fe25519 g);
 +void sodium_esphome_fe25519_mul(fe25519 h, const fe25519 f, const fe25519 g);
