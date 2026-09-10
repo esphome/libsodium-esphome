@@ -1,5 +1,5 @@
 diff --git a/src/libsodium/crypto_hash/sha256/cp/hash_sha256_cp.c b/src/libsodium/crypto_hash/sha256/cp/hash_sha256_cp.c
-index 832dabb9..6e73b79d 100644
+index 832dabb9..e011618d 100644
 --- a/src/libsodium/crypto_hash/sha256/cp/hash_sha256_cp.c
 +++ b/src/libsodium/crypto_hash/sha256/cp/hash_sha256_cp.c
 @@ -35,6 +35,7 @@
@@ -22,7 +22,7 @@ index 832dabb9..6e73b79d 100644
      }
  }
  
-@@ -96,63 +101,54 @@ static const uint32_t SHA256_KRND_ATTR Krnd[64] = {
+@@ -96,63 +101,62 @@ static const uint32_t SHA256_KRND_ATTR Krnd[64] = {
      d += h;                            \
      h += S0(a) + Maj(a, b, c);
  
@@ -41,14 +41,12 @@ index 832dabb9..6e73b79d 100644
 +   at the unrolled transform's speed per block. Fewer rounds per pass are
 +   smaller still but slower per block, and a handshake, whose hashes come
 +   in cold from flash, measured fastest with four on every target. The
-+   working variables are locals and are left in place on purpose: the
-+   caller's sodium_memzero of its scratch no longer covers them, but their
-+   residue is only the state difference, which the state object holds
-+   anyway, and a wipe of dead locals would be optimised away. */
++   working variables live in locals for the loop and are copied into the
++   caller's scratch S at the end, so its sodium_memzero still covers what
++   it covered with the unrolled rounds. */
  static void
--SHA256_Transform(uint32_t state[8], const uint8_t block[64], uint32_t W[64],
--                 uint32_t S[8])
-+SHA256_Transform(uint32_t state[8], const uint8_t block[64], uint32_t W[64])
+ SHA256_Transform(uint32_t state[8], const uint8_t block[64], uint32_t W[64],
+                  uint32_t S[8])
  {
 +    uint32_t a, b, c, d, e, f, g, h, t;
      int i;
@@ -116,6 +114,14 @@ index 832dabb9..6e73b79d 100644
 +        t = c; c = g; g = t;
 +        t = d; d = h; h = t;
      }
++    S[0] = a;
++    S[1] = b;
++    S[2] = c;
++    S[3] = d;
++    S[4] = e;
++    S[5] = f;
++    S[6] = g;
++    S[7] = h;
 +    state[0] += a;
 +    state[1] += b;
 +    state[2] += c;
@@ -127,59 +133,3 @@ index 832dabb9..6e73b79d 100644
  }
  
  static const uint8_t PAD[64] = { 0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-@@ -162,7 +158,7 @@ static const uint8_t PAD[64] = { 0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                                  0,    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
- 
- static void
--SHA256_Pad(crypto_hash_sha256_state *state, uint32_t tmp32[64 + 8])
-+SHA256_Pad(crypto_hash_sha256_state *state, uint32_t tmp32[64])
- {
-     unsigned int r;
-     unsigned int i;
-@@ -177,11 +173,11 @@ SHA256_Pad(crypto_hash_sha256_state *state, uint32_t tmp32[64 + 8])
-         for (i = 0; i < 64 - r; i++) {
-             state->buf[r + i] = PAD[i];
-         }
--        SHA256_Transform(state->state, state->buf, &tmp32[0], &tmp32[64]);
-+        SHA256_Transform(state->state, state->buf, tmp32);
-         memset(&state->buf[0], 0, 56);
-     }
-     STORE64_BE(&state->buf[56], state->count);
--    SHA256_Transform(state->state, state->buf, &tmp32[0], &tmp32[64]);
-+    SHA256_Transform(state->state, state->buf, tmp32);
- }
- 
- int
-@@ -202,7 +198,7 @@ int
- crypto_hash_sha256_update(crypto_hash_sha256_state *state,
-                           const unsigned char *in, unsigned long long inlen)
- {
--    uint32_t           tmp32[64 + 8];
-+    uint32_t           tmp32[64];
-     unsigned long long i;
-     unsigned long long r;
- 
-@@ -222,12 +218,12 @@ crypto_hash_sha256_update(crypto_hash_sha256_state *state,
-     for (i = 0; i < 64 - r; i++) {
-         state->buf[r + i] = in[i];
-     }
--    SHA256_Transform(state->state, state->buf, &tmp32[0], &tmp32[64]);
-+    SHA256_Transform(state->state, state->buf, tmp32);
-     in += 64 - r;
-     inlen -= 64 - r;
- 
-     while (inlen >= 64) {
--        SHA256_Transform(state->state, in, &tmp32[0], &tmp32[64]);
-+        SHA256_Transform(state->state, in, tmp32);
-         in += 64;
-         inlen -= 64;
-     }
-@@ -243,7 +239,7 @@ crypto_hash_sha256_update(crypto_hash_sha256_state *state,
- int
- crypto_hash_sha256_final(crypto_hash_sha256_state *state, unsigned char *out)
- {
--    uint32_t tmp32[64 + 8];
-+    uint32_t tmp32[64];
- 
-     SHA256_Pad(state, tmp32);
-     be32enc_vect(out, state->state, 32);

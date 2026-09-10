@@ -474,11 +474,6 @@ static void test_sha256(void)
         0x5d, 0xae, 0x22, 0x23, 0xb0, 0x03, 0x61, 0xa3, 0x96, 0x17, 0x7a, 0x9c,
         0xb4, 0x10, 0xff, 0x61, 0xf2, 0x00, 0x15, 0xad
     };
-    unsigned char out[32];
-    crypto_hash_sha256(out, (const unsigned char *) "abc", 3);
-    check(memcmp(out, expected, 32) == 0, "sha256 known answer");
-    /* Two blocks, so the state carries across a block boundary;
-       FIPS 180-4 example B.2 */
     static const unsigned char two_blocks[] =
         "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq";
     static const unsigned char expected2[32] = {
@@ -487,6 +482,11 @@ static void test_sha256(void)
         0xa3, 0x3c, 0xe4, 0x59, 0x64, 0xff, 0x21, 0x67,
         0xf6, 0xec, 0xed, 0xd4, 0x19, 0xdb, 0x06, 0xc1
     };
+    unsigned char out[32];
+    crypto_hash_sha256(out, (const unsigned char *) "abc", 3);
+    check(memcmp(out, expected, 32) == 0, "sha256 known answer");
+    /* Two blocks, so the state carries across a block boundary;
+       FIPS 180-4 example B.2 */
     crypto_hash_sha256(out, two_blocks, sizeof two_blocks - 1);
     check(memcmp(out, expected2, 32) == 0, "sha256 two block known answer");
 }
