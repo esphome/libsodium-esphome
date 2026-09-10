@@ -492,13 +492,32 @@ static void test_sha256(void)
         0xa3, 0x3c, 0xe4, 0x59, 0x64, 0xff, 0x21, 0x67,
         0xf6, 0xec, 0xed, 0xd4, 0x19, 0xdb, 0x06, 0xc1
     };
+    static const unsigned char expected3[32] = {
+        0xcd, 0xc7, 0x6e, 0x5c, 0x99, 0x14, 0xfb, 0x92,
+        0x81, 0xa1, 0xc7, 0xe2, 0x84, 0xd7, 0x3e, 0x67,
+        0xf1, 0x80, 0x9a, 0x48, 0xa4, 0x97, 0x20, 0x0e,
+        0x04, 0x6d, 0x39, 0xcc, 0xc7, 0x11, 0x2c, 0xd0
+    };
+    static unsigned char million[4093];
+    crypto_hash_sha256_state st;
     unsigned char out[32];
+    size_t fed, piece;
     crypto_hash_sha256(out, (const unsigned char *) "abc", 3);
     check(memcmp(out, expected, 32) == 0, "sha256 known answer");
     /* Two blocks, so the state carries across a block boundary;
        FIPS 180-4 example B.2 */
     crypto_hash_sha256(out, two_blocks, sizeof two_blocks - 1);
     check(memcmp(out, expected2, 32) == 0, "sha256 two block known answer");
+    /* A million bytes, FIPS 180-4 example B.3, fed in odd sized pieces so
+       update's bulk loop sees the caller's buffer at every alignment */
+    memset(million, 'a', sizeof million);
+    crypto_hash_sha256_init(&st);
+    for (fed = 0; fed < 1000000; fed += piece) {
+        piece = 1000000 - fed < 4093 ? 1000000 - fed : 4093;
+        crypto_hash_sha256_update(&st, million, piece);
+    }
+    crypto_hash_sha256_final(&st, out);
+    check(memcmp(out, expected3, 32) == 0, "sha256 million byte known answer");
 }
 
 /* The compact transform against upstream's unrolled one: one shot over

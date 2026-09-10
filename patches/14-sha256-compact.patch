@@ -1,28 +1,25 @@
 diff --git a/src/libsodium/crypto_hash/sha256/cp/hash_sha256_cp.c b/src/libsodium/crypto_hash/sha256/cp/hash_sha256_cp.c
-index 832dabb9..e011618d 100644
+index 832dabb9..0db25521 100644
 --- a/src/libsodium/crypto_hash/sha256/cp/hash_sha256_cp.c
 +++ b/src/libsodium/crypto_hash/sha256/cp/hash_sha256_cp.c
-@@ -35,6 +35,7 @@
+@@ -35,8 +35,16 @@
  
  #include "crypto_hash_sha256.h"
  #include "private/common.h"
 +#include "sodium/esphome_platform.h"
  #include "utils.h"
  
- static void
-@@ -53,7 +54,11 @@ be32dec_vect(uint32_t *dst, const unsigned char *src, size_t len)
-     size_t i;
- 
-     for (i = 0; i < len / 4; i++) {
 +#ifdef SODIUM_ESPHOME_ESP8266_PATHS
-+        dst[i] = sodium_esphome_load32_be(src + i * 4);
-+#else
-         dst[i] = LOAD32_BE(src + i * 4);
++/* Big endian block decode without the libgcc byte swap call, as patch 13
++   does for the little endian loads */
++#undef LOAD32_BE
++#define LOAD32_BE(p) sodium_esphome_load32_be(p)
 +#endif
-     }
- }
- 
-@@ -96,63 +101,62 @@ static const uint32_t SHA256_KRND_ATTR Krnd[64] = {
++
+ static void
+ be32enc_vect(unsigned char *dst, const uint32_t *src, size_t len)
+ {
+@@ -96,63 +104,62 @@ static const uint32_t SHA256_KRND_ATTR Krnd[64] = {
      d += h;                            \
      h += S0(a) + Maj(a, b, c);
  
@@ -37,7 +34,7 @@ index 832dabb9..e011618d 100644
 -
 +/* Four rounds per loop pass, the working variables rotated by name inside
 +   the pass and swapped once at its end, in place of 64 unrolled rounds:
-+   about 1.9 KB less flash on the ESP8266 (the transform 2508 to 600 bytes)
++   about 1.9 KB less flash on the ESP8266 (the transform 2508 to 586 bytes)
 +   at the unrolled transform's speed per block. Fewer rounds per pass are
 +   smaller still but slower per block, and a handshake, whose hashes come
 +   in cold from flash, measured fastest with four on every target. The
