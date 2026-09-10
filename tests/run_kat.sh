@@ -22,13 +22,13 @@ cmake -B "$build" -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS="$cflags" .
 cmake --build "$build" -j
 # upstream's SHA256 and ref10 X25519 as they are at the pinned tag, for the
 # differentials in kat.c: the references are compiled against a pristine copy
-# of the upstream tree, so no fork header can leak into them
+# of the upstream tree and without the caller's flags, so neither a fork
+# header nor a fork switch can reach them
 up=$build/upstream
 rm -rf "$up" && mkdir -p "$up"
 git -C libsodium archive HEAD src/libsodium | tar -x -C "$up"
 for ref in sha256 x25519; do
-  # shellcheck disable=SC2086
-  gcc -O2 -Wall -Wextra -DCONFIGURED=1 $cflags -c -o "$build/${ref}_reference.o" \
+  gcc -O2 -Wall -Wextra -DCONFIGURED=1 -c -o "$build/${ref}_reference.o" \
     "tests/${ref}_reference.c" -I"$up/src/libsodium" -I"$up/src/libsodium/include" \
     -I"$up/src/libsodium/include/sodium" \
     -I"$up/src/libsodium/crypto_core/ed25519/ref10" \
