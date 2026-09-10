@@ -342,6 +342,7 @@ static void test_x25519_base_vectors(void)
 static void test_x25519_differential(void)
 {
     unsigned char k[32], u[32], a[32], b[32];
+    int before = failures;
     int i;
 
     for (i = 0; i < 500; i++) {
@@ -364,7 +365,9 @@ static void test_x25519_differential(void)
                   memcmp(a, b, 32) == 0,
               "m15 base point multiply vs upstream ref10");
     }
-    printf("x25519: m15 base point multiply byte identical to upstream ref10 on 500 random scalars\n");
+    if (failures == before) {
+        printf("x25519: m15 base point multiply byte identical to upstream ref10 on 500 random scalars\n");
+    }
 }
 
 /* RFC 8439 section 2.5.2 Poly1305 vector (the AEAD vector is checked in
