@@ -1,5 +1,5 @@
 diff --git a/src/libsodium/crypto_hash/sha256/cp/hash_sha256_cp.c b/src/libsodium/crypto_hash/sha256/cp/hash_sha256_cp.c
-index 832dabb9..7e202497 100644
+index 832dabb9..5a6e3b33 100644
 --- a/src/libsodium/crypto_hash/sha256/cp/hash_sha256_cp.c
 +++ b/src/libsodium/crypto_hash/sha256/cp/hash_sha256_cp.c
 @@ -35,8 +35,16 @@
@@ -38,11 +38,11 @@ index 832dabb9..7e202497 100644
 +   at the unrolled transform's speed per block. Fewer rounds per pass are
 +   smaller still but slower per block, and a handshake, whose hashes come
 +   in cold from flash, measured fastest with four on every target. The
-+   working variables are locals: on the Xtensa cores they stay in
-+   registers and nothing of them reaches memory, and a target that spills
-+   them leaves what any compiler could leave of upstream's too. Upstream's
-+   copy of them in the caller's scratch, the part its sodium_memzero
-+   wiped, is not kept. */
++   working variables are plain locals; the ESP8266 build happens to keep
++   them in registers, and a build that spills them leaves no more behind
++   than any compiler could have left of upstream's. Upstream's copy of
++   them in the caller's scratch, the part its sodium_memzero wiped, is not
++   kept. */
  static void
 -SHA256_Transform(uint32_t state[8], const uint8_t block[64], uint32_t W[64],
 -                 uint32_t S[8])
