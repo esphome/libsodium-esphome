@@ -1,5 +1,5 @@
 diff --git a/src/libsodium/crypto_hash/sha256/cp/hash_sha256_cp.c b/src/libsodium/crypto_hash/sha256/cp/hash_sha256_cp.c
-index 832dabb9..e968bea1 100644
+index 832dabb9..7e202497 100644
 --- a/src/libsodium/crypto_hash/sha256/cp/hash_sha256_cp.c
 +++ b/src/libsodium/crypto_hash/sha256/cp/hash_sha256_cp.c
 @@ -35,8 +35,16 @@
@@ -19,7 +19,7 @@ index 832dabb9..e968bea1 100644
  static void
  be32enc_vect(unsigned char *dst, const uint32_t *src, size_t len)
  {
-@@ -96,63 +104,53 @@ static const uint32_t SHA256_KRND_ATTR Krnd[64] = {
+@@ -96,63 +104,55 @@ static const uint32_t SHA256_KRND_ATTR Krnd[64] = {
      d += h;                            \
      h += S0(a) + Maj(a, b, c);
  
@@ -38,9 +38,11 @@ index 832dabb9..e968bea1 100644
 +   at the unrolled transform's speed per block. Fewer rounds per pass are
 +   smaller still but slower per block, and a handshake, whose hashes come
 +   in cold from flash, measured fastest with four on every target. The
-+   working variables stay in registers on the Xtensa cores, so nothing of
-+   them reaches memory; upstream's copy of them in the caller's scratch,
-+   the part its sodium_memzero wiped, is not kept. */
++   working variables are locals: on the Xtensa cores they stay in
++   registers and nothing of them reaches memory, and a target that spills
++   them leaves what any compiler could leave of upstream's too. Upstream's
++   copy of them in the caller's scratch, the part its sodium_memzero
++   wiped, is not kept. */
  static void
 -SHA256_Transform(uint32_t state[8], const uint8_t block[64], uint32_t W[64],
 -                 uint32_t S[8])
@@ -123,7 +125,7 @@ index 832dabb9..e968bea1 100644
  }
  
  static const uint8_t PAD[64] = { 0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-@@ -162,7 +160,7 @@ static const uint8_t PAD[64] = { 0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+@@ -162,7 +162,7 @@ static const uint8_t PAD[64] = { 0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                                   0,    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
  
  static void
@@ -132,7 +134,7 @@ index 832dabb9..e968bea1 100644
  {
      unsigned int r;
      unsigned int i;
-@@ -177,11 +175,11 @@ SHA256_Pad(crypto_hash_sha256_state *state, uint32_t tmp32[64 + 8])
+@@ -177,11 +177,11 @@ SHA256_Pad(crypto_hash_sha256_state *state, uint32_t tmp32[64 + 8])
          for (i = 0; i < 64 - r; i++) {
              state->buf[r + i] = PAD[i];
          }
@@ -146,7 +148,7 @@ index 832dabb9..e968bea1 100644
  }
  
  int
-@@ -202,7 +200,7 @@ int
+@@ -202,7 +202,7 @@ int
  crypto_hash_sha256_update(crypto_hash_sha256_state *state,
                            const unsigned char *in, unsigned long long inlen)
  {
@@ -155,7 +157,7 @@ index 832dabb9..e968bea1 100644
      unsigned long long i;
      unsigned long long r;
  
-@@ -222,12 +220,12 @@ crypto_hash_sha256_update(crypto_hash_sha256_state *state,
+@@ -222,12 +222,12 @@ crypto_hash_sha256_update(crypto_hash_sha256_state *state,
      for (i = 0; i < 64 - r; i++) {
          state->buf[r + i] = in[i];
      }
@@ -170,7 +172,7 @@ index 832dabb9..e968bea1 100644
          in += 64;
          inlen -= 64;
      }
-@@ -243,7 +241,7 @@ crypto_hash_sha256_update(crypto_hash_sha256_state *state,
+@@ -243,7 +243,7 @@ crypto_hash_sha256_update(crypto_hash_sha256_state *state,
  int
  crypto_hash_sha256_final(crypto_hash_sha256_state *state, unsigned char *out)
  {
