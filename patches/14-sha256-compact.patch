@@ -1,5 +1,5 @@
 diff --git a/src/libsodium/crypto_hash/sha256/cp/hash_sha256_cp.c b/src/libsodium/crypto_hash/sha256/cp/hash_sha256_cp.c
-index 832dabb9..3eddca21 100644
+index 832dabb9..4a1bf89d 100644
 --- a/src/libsodium/crypto_hash/sha256/cp/hash_sha256_cp.c
 +++ b/src/libsodium/crypto_hash/sha256/cp/hash_sha256_cp.c
 @@ -35,6 +35,7 @@
@@ -35,14 +35,15 @@ index 832dabb9..3eddca21 100644
 -    W[i + ii + 16] =   \
 -        s1(W[i + ii + 14]) + W[i + ii + 9] + s0(W[i + ii + 1]) + W[i + ii]
 -
-+/* One round per pass with the working variables rotated by hand, and the
-+   message schedule filled in as the rounds reach it, in place of 64
-+   unrolled rounds: about 2 KB less flash on the ESP8266 (the transform
-+   alone 2508 to 324 bytes). A Noise handshake hashes a few dozen short
-+   inputs and the transport none, so the per block cost does not reach a
-+   connect on any target. The working variables are locals here, so the
-+   caller's sodium_memzero of its scratch no longer covers them; their
-+   residue is the state difference, which the state object holds anyway. */
++/* Four rounds per loop pass, the working variables rotated by name inside
++   the pass and swapped once at its end, in place of 64 unrolled rounds:
++   about 1.9 KB less flash on the ESP8266 (the transform 2508 to 600 bytes)
++   at the unrolled transform's speed per block. Fewer rounds per pass are
++   smaller still but slower per block, and a handshake, whose hashes come
++   in cold from flash, measured fastest with four on every target. The
++   working variables are locals, so the caller's sodium_memzero of its
++   scratch no longer covers them; their residue is the state difference,
++   which the state object holds anyway. */
  static void
 -SHA256_Transform(uint32_t state[8], const uint8_t block[64], uint32_t W[64],
 -                 uint32_t S[8])
@@ -72,18 +73,7 @@ index 832dabb9..3eddca21 100644
 -        RNDr(S, W, 15, i);
 -        if (i == 48) {
 -            break;
-+    a = state[0];
-+    b = state[1];
-+    c = state[2];
-+    d = state[3];
-+    e = state[4];
-+    f = state[5];
-+    g = state[6];
-+    h = state[7];
-+    for (i = 0; i < 64; i++) {
-+        if (i >= 16) {
-+            W[i] = s1(W[i - 2]) + W[i - 7] + s0(W[i - 15]) + W[i - 16];
-         }
+-        }
 -        MSCH(W, 0, i);
 -        MSCH(W, 1, i);
 -        MSCH(W, 2, i);
@@ -100,20 +90,30 @@ index 832dabb9..3eddca21 100644
 -        MSCH(W, 13, i);
 -        MSCH(W, 14, i);
 -        MSCH(W, 15, i);
--    }
++    for (i = 16; i < 64; i++) {
++        W[i] = s1(W[i - 2]) + W[i - 7] + s0(W[i - 15]) + W[i - 16];
+     }
 -    for (i = 0; i < 8; i++) {
 -        state[i] += S[i];
-+        /* RND leaves the new a in h and the new e in d */
++    a = state[0];
++    b = state[1];
++    c = state[2];
++    d = state[3];
++    e = state[4];
++    f = state[5];
++    g = state[6];
++    h = state[7];
++    for (i = 0; i < 64; i += 4) {
++        /* RND leaves the new a in its last argument and the new e in its
++           fourth, so each round names the variables one step around */
 +        RND(a, b, c, d, e, f, g, h, W[i] + Krnd[i]);
-+        t = h;
-+        h = g;
-+        g = f;
-+        f = e;
-+        e = d;
-+        d = c;
-+        c = b;
-+        b = a;
-+        a = t;
++        RND(h, a, b, c, d, e, f, g, W[i + 1] + Krnd[i + 1]);
++        RND(g, h, a, b, c, d, e, f, W[i + 2] + Krnd[i + 2]);
++        RND(f, g, h, a, b, c, d, e, W[i + 3] + Krnd[i + 3]);
++        t = a; a = e; e = t;
++        t = b; b = f; f = t;
++        t = c; c = g; g = t;
++        t = d; d = h; h = t;
      }
 +    state[0] += a;
 +    state[1] += b;
