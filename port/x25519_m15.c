@@ -1098,7 +1098,10 @@ sodium_esphome_x25519_m15(unsigned char *q, const unsigned char *n,
 typedef uint32_t f255_elt[20];
 
 /* the point forms of ref10's walk: extended (X, Y, Z, T), the completed
-   result of a doubling or addition, and the table's (y+x, y-x, 2dxy) */
+   result of a doubling or addition, and the table's (y+x, y-x, 2dxy).
+   ge_m15_p3 also serves as ref10's projective form: after
+   ge_m15_p1p1_to_p2 only X, Y and Z are valid and T is stale, which is
+   safe because ge_m15_p2_dbl never reads T. */
 typedef struct {
 	f255_elt X, Y, Z, T;
 } ge_m15_p3;
