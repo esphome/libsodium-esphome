@@ -1,0 +1,26 @@
+diff --git a/src/libsodium/crypto_onetimeauth/poly1305/donna/poly1305_donna.c b/src/libsodium/crypto_onetimeauth/poly1305/donna/poly1305_donna.c
+index bfde5040..8b94162e 100644
+--- a/src/libsodium/crypto_onetimeauth/poly1305/donna/poly1305_donna.c
++++ b/src/libsodium/crypto_onetimeauth/poly1305/donna/poly1305_donna.c
+@@ -126,8 +126,6 @@ crypto_onetimeauth_poly1305_aead_mac(unsigned char *mac,
+                                      unsigned long long clen,
+                                      const unsigned char *key)
+ {
+-    static const unsigned char _pad0[16] = { 0 };
+-
+     CRYPTO_ALIGN(64) poly1305_state_internal_t st;
+     CRYPTO_ALIGN(16) unsigned char             tail[32];
+     size_t                                     rem;
+@@ -136,7 +134,11 @@ crypto_onetimeauth_poly1305_aead_mac(unsigned char *mac,
+     poly1305_init(&st, key);
+     if (adlen > 0U) {
+         poly1305_update(&st, ad, adlen);
+-        poly1305_update(&st, _pad0, (size_t) ((0x10 - adlen) & 0xf));
++        /* the zero pad comes from tail, which nothing writes until the
++           ciphertext step below, rather than from a static the ESP8266
++           would keep in DRAM */
++        memset(tail, 0, 16);
++        poly1305_update(&st, tail, (size_t) ((0x10 - adlen) & 0xf));
+     }
+     /*
+      * Process the ciphertext in whole blocks, then hash the remainder, the
