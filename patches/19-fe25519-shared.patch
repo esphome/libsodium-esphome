@@ -1,48 +1,98 @@
 diff --git a/src/libsodium/crypto_core/ed25519/ref10/ed25519_ref10.c b/src/libsodium/crypto_core/ed25519/ref10/ed25519_ref10.c
-index 1a293cbb..db8f65ca 100644
+index 1a293cbb..2979bfc6 100644
 --- a/src/libsodium/crypto_core/ed25519/ref10/ed25519_ref10.c
 +++ b/src/libsodium/crypto_core/ed25519/ref10/ed25519_ref10.c
-@@ -5,6 +5,7 @@
+@@ -5,6 +5,9 @@
  
  #include "crypto_verify_32.h"
  #include "private/common.h"
-+#define SODIUM_ESPHOME_FE25519_DEFINE
++/* ESPHome port: this file holds the one copy of the shared field functions,
++   see ed25519_ref10_fe_25_5.h */
++#define ED25519_REF10_FE25519_IMPLEMENTATION
  #include "private/ed25519_ref10.h"
  #include "utils.h"
  
 diff --git a/src/libsodium/include/sodium/private/ed25519_ref10_fe_25_5.h b/src/libsodium/include/sodium/private/ed25519_ref10_fe_25_5.h
-index 78c3f4a5..178275c3 100644
+index 78c3f4a5..4c856570 100644
 --- a/src/libsodium/include/sodium/private/ed25519_ref10_fe_25_5.h
 +++ b/src/libsodium/include/sodium/private/ed25519_ref10_fe_25_5.h
-@@ -370,7 +370,13 @@ fe25519_iszero(const fe25519 f)
+@@ -63,7 +63,16 @@ fe25519_1(fe25519 h)
+  |h| bounded by 1.1*2^26,1.1*2^25,1.1*2^26,1.1*2^25,etc.
+  */
+ 
+-static inline void
++/* ESPHome port: these four are defined once, by ed25519_ref10.c, instead of
++   as a static copy in every file that includes this header; on the wide
++   multiply targets that drops the copies x25519_ref10.c made. */
++void fe25519_add(fe25519 h, const fe25519 f, const fe25519 g);
++void fe25519_sub(fe25519 h, const fe25519 f, const fe25519 g);
++void fe25519_mul(fe25519 h, const fe25519 f, const fe25519 g);
++void fe25519_sq(fe25519 h, const fe25519 f);
++
++#ifdef ED25519_REF10_FE25519_IMPLEMENTATION
++void
+ fe25519_add(fe25519 h, const fe25519 f, const fe25519 g)
+ {
+     int32_t h0 = f[0] + g[0];
+@@ -88,6 +97,7 @@ fe25519_add(fe25519 h, const fe25519 f, const fe25519 g)
+     h[8] = h8;
+     h[9] = h9;
+ }
++#endif /* ED25519_REF10_FE25519_IMPLEMENTATION */
+ 
+ /*
+  h = f - g
+@@ -101,7 +111,8 @@ fe25519_add(fe25519 h, const fe25519 f, const fe25519 g)
+  |h| bounded by 1.1*2^26,1.1*2^25,1.1*2^26,1.1*2^25,etc.
+  */
+ 
+-static void
++#ifdef ED25519_REF10_FE25519_IMPLEMENTATION
++void
+ fe25519_sub(fe25519 h, const fe25519 f, const fe25519 g)
+ {
+     int32_t h0 = f[0] - g[0];
+@@ -126,6 +137,7 @@ fe25519_sub(fe25519 h, const fe25519 f, const fe25519 g)
+     h[8] = h8;
+     h[9] = h9;
+ }
++#endif /* ED25519_REF10_FE25519_IMPLEMENTATION */
+ 
+ /*
+  h = -f
+@@ -370,7 +382,8 @@ fe25519_iszero(const fe25519 f)
   With tighter constraints on inputs can squeeze carries into int32.
   */
  
 -static void
-+/* One copy of the two large products, defined by ed25519_ref10.c, instead
-+   of a static copy in every file that includes this header. */
-+void fe25519_mul(fe25519 h, const fe25519 f, const fe25519 g);
-+void fe25519_sq(fe25519 h, const fe25519 f);
-+
-+#ifdef SODIUM_ESPHOME_FE25519_DEFINE
++#ifdef ED25519_REF10_FE25519_IMPLEMENTATION
 +void
  fe25519_mul(fe25519 h, const fe25519 f, const fe25519 g)
  {
      int32_t f0 = f[0];
-@@ -743,7 +749,7 @@ fe25519_mul(fe25519 h, const fe25519 f, const fe25519 g)
+@@ -731,6 +744,7 @@ fe25519_mul(fe25519 h, const fe25519 f, const fe25519 g)
+     h[8] = (int32_t) h8;
+     h[9] = (int32_t) h9;
+ }
++#endif /* ED25519_REF10_FE25519_IMPLEMENTATION */
+ 
+ /*
+  h = f * f
+@@ -743,7 +757,8 @@ fe25519_mul(fe25519 h, const fe25519 f, const fe25519 g)
   |h| bounded by 1.01*2^25,1.01*2^24,1.01*2^25,1.01*2^24,etc.
   */
  
 -static void
++#ifdef ED25519_REF10_FE25519_IMPLEMENTATION
 +void
  fe25519_sq(fe25519 h, const fe25519 f)
  {
      int32_t f0 = f[0];
-@@ -961,6 +967,7 @@ fe25519_sq(fe25519 h, const fe25519 f)
+@@ -961,6 +976,7 @@ fe25519_sq(fe25519 h, const fe25519 f)
      h[8] = (int32_t) h8;
      h[9] = (int32_t) h9;
  }
-+#endif
++#endif /* ED25519_REF10_FE25519_IMPLEMENTATION */
  
  /*
   h = 2 * f * f
