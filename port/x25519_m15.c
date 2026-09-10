@@ -1089,7 +1089,8 @@ sodium_esphome_x25519_m15(unsigned char *q, const unsigned char *n,
  */
 
 #ifdef SODIUM_ESPHOME_ESP8266
-#define M15_BASE_ATTR __attribute__((section(".irom.text")))
+/* flash only supports aligned 32 bit access, so the alignment is stated */
+#define M15_BASE_ATTR CRYPTO_ALIGN(4) __attribute__((section(".irom.text")))
 #else
 #define M15_BASE_ATTR
 #endif
