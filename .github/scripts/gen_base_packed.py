@@ -1,4 +1,4 @@
-"""Generate the packed Ed25519 base point table used by patch 10.
+"""Generate the packed Ed25519 base point table walked by patch 10 and port/x25519_m15.c.
 
 Reads the reference fe_25_5 table (32 tables x 8 points, each point three
 field elements of ten limbs) and writes every second table as 32 byte

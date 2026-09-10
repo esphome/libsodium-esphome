@@ -1,0 +1,45 @@
+diff --git a/src/libsodium/crypto_scalarmult/curve25519/ref10/x25519_ref10.c b/src/libsodium/crypto_scalarmult/curve25519/ref10/x25519_ref10.c
+index 22b6ef65..f6f19f9f 100644
+--- a/src/libsodium/crypto_scalarmult/curve25519/ref10/x25519_ref10.c
++++ b/src/libsodium/crypto_scalarmult/curve25519/ref10/x25519_ref10.c
+@@ -11,10 +11,11 @@
+ #include "sodium/esphome_yield.h"
+ #include "sodium/esphome_x25519_m15.h"
+ 
+-/* ESPHome port: on cores without a 32x32->64 multiply the ladder below is
+-   replaced by the m15 one in port/x25519_m15.c. The small order blacklist
+-   goes with it; the wrapper in scalarmult_curve25519.c rejects the all zero
+-   output such points produce. */
++/* ESPHome port: on cores without a 32x32->64 multiply the ladder and the
++   base point multiply below are replaced by the m15 ones in
++   port/x25519_m15.c. The small order denylist goes with them; the wrapper
++   in scalarmult_curve25519.c rejects the all zero output such points
++   produce. */
+ #ifndef SODIUM_ESPHOME_X25519_M15
+ /*
+  * Reject small order points early to mitigate the implications of
+@@ -149,7 +150,6 @@ crypto_scalarmult_curve25519_ref10(unsigned char *q,
+ 
+     return 0;
+ }
+-#endif /* SODIUM_ESPHOME_X25519_M15 */
+ 
+ static void
+ edwards_to_montgomery(fe25519 montgomeryX, const fe25519 edwardsY, const fe25519 edwardsZ)
+@@ -184,13 +184,15 @@ crypto_scalarmult_curve25519_ref10_base(unsigned char *q,
+ 
+     return 0;
+ }
++#endif /* SODIUM_ESPHOME_X25519_M15 */
+ 
+ struct crypto_scalarmult_curve25519_implementation
+     crypto_scalarmult_curve25519_ref10_implementation = {
+ #ifdef SODIUM_ESPHOME_X25519_M15
+         SODIUM_C99(.mult =) sodium_esphome_x25519_m15,
++        SODIUM_C99(.mult_base =) sodium_esphome_x25519_m15_base
+ #else
+         SODIUM_C99(.mult =) crypto_scalarmult_curve25519_ref10,
+-#endif
+         SODIUM_C99(.mult_base =) crypto_scalarmult_curve25519_ref10_base
++#endif
+     };

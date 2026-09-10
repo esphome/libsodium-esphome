@@ -25,10 +25,10 @@
 /*
  * X25519 for cores without a 32x32->64 multiply (ESP8266, Cortex-M0+) using
  * BearSSL's "m15" Curve25519 field arithmetic (13-bit limbs, 32-bit
- * products). On those cores libsodium's ref10 ladder spends most of its time
- * in software 64-bit products; the m15 representation needs none. Only the
- * variable-base ladder lives here: the base point multiply keeps ref10's
- * precomputed Edwards tables, which beat a ladder even on these cores.
+ * products). On those cores libsodium's ref10 code spends most of its time
+ * in software 64-bit products; the m15 representation needs none. Both the
+ * variable-base ladder and the base point multiply live here; the latter
+ * walks ref10's packed Edwards table with m15 field arithmetic.
  *
  * The field code is taken unchanged from BearSSL src/ec/ec_c25519_m15.c
  * (MIT, see above). The ladder takes the little endian X25519 scalar and
@@ -965,6 +965,40 @@ cswap(uint32_t *a, uint32_t *b, uint32_t ctl)
 	}
 }
 
+/*
+ * Inverse of a by exponentiation (p - 2), as in BearSSL; d receives the
+ * result and t is scratch, 20 words each, and a, d and t must be three
+ * distinct buffers.
+ */
+static void
+f255_invert(uint32_t *d, const uint32_t *a, uint32_t *t)
+{
+	int i;
+
+	memcpy(t, a, 20 * sizeof(uint32_t));
+	for (i = 0; i < 15; i ++) {
+		SODIUM_ESP8266_YIELD();
+		f255_square(t, t);
+		f255_mul(t, t, a);
+	}
+	memcpy(d, t, 20 * sizeof(uint32_t));
+	for (i = 0; i < 14; i ++) {
+		int j;
+
+		SODIUM_ESP8266_YIELD();
+		for (j = 0; j < 16; j ++) {
+			f255_square(d, d);
+		}
+		f255_mul(d, d, t);
+	}
+	for (i = 14; i >= 0; i --) {
+		f255_square(d, d);
+		if ((0xFFEB >> i) & 1) {
+			f255_mul(d, a, d);
+		}
+	}
+}
+
 int
 sodium_esphome_x25519_m15(unsigned char *q, const unsigned char *n,
                           const unsigned char *p)
@@ -1037,34 +1071,218 @@ sodium_esphome_x25519_m15(unsigned char *q, const unsigned char *n,
 	cswap(x2, x3, swap);
 	cswap(z2, z3, swap);
 
-	/*
-	 * Inverse of z2 by exponentiation (p - 2), as in BearSSL.
-	 */
-	memcpy(t1, z2, sizeof w.z2);
-	for (i = 0; i < 15; i ++) {
-		SODIUM_ESP8266_YIELD();
-		f255_square(t1, t1);
-		f255_mul(t1, t1, z2);
-	}
-	memcpy(t2, t1, sizeof w.t1);
-	for (i = 0; i < 14; i ++) {
-		int j;
-
-		SODIUM_ESP8266_YIELD();
-		for (j = 0; j < 16; j ++) {
-			f255_square(t2, t2);
-		}
-		f255_mul(t2, t2, t1);
-	}
-	for (i = 14; i >= 0; i --) {
-		f255_square(t2, t2);
-		if ((0xFFEB >> i) & 1) {
-			f255_mul(t2, z2, t2);
-		}
-	}
+	f255_invert(t2, z2, t1);
 	f255_mul(x2, x2, t2);
 	reduce_final_f255(x2);
 	le13_to_le8(q, 32, x2);
+	sodium_memzero(&w, sizeof w);
+	return 0;
+}
+
+/*
+ * Base point multiply on the same 13-bit limbs: the ref10 walk over the
+ * packed Edwards table of patch 10 (16 windows of 8 points as canonical
+ * byte encodings of y+x, y-x and 2dxy), with the point arithmetic written
+ * on f255_mul, so the ref10 field code is not linked on these cores. The
+ * curve is the twisted Edwards form with a = -1, as ref10 uses, and the
+ * result is converted to the Montgomery u coordinate at the end.
+ */
+
+#ifdef SODIUM_ESPHOME_ESP8266
+/* flash only supports aligned 32 bit access, so the alignment is stated */
+#define M15_BASE_ATTR CRYPTO_ALIGN(4) __attribute__((section(".irom.text")))
+#else
+#define M15_BASE_ATTR
+#endif
+
+typedef uint32_t f255_elt[20];
+
+/* the point forms of ref10's walk: extended (X, Y, Z, T), the completed
+   result of a doubling or addition, and the table's (y+x, y-x, 2dxy).
+   ge_m15_p3 also serves as ref10's projective form: after
+   ge_m15_p1p1_to_p2 only X, Y and Z are valid and T is stale, which is
+   safe because ge_m15_p2_dbl never reads T. */
+typedef struct {
+	f255_elt X, Y, Z, T;
+} ge_m15_p3;
+
+typedef struct {
+	f255_elt X, Y, Z, T;
+} ge_m15_p1p1;
+
+typedef struct {
+	f255_elt yplusx, yminusx, xy2d;
+} ge_m15_precomp;
+
+/* completed -> projective: X = X*T, Y = Y*Z, Z = Z*T; extended adds T = X*Y */
+static void
+ge_m15_p1p1_to_p2(ge_m15_p3 *h, const ge_m15_p1p1 *r)
+{
+	f255_mul(h->X, r->X, r->T);
+	f255_mul(h->Y, r->Y, r->Z);
+	f255_mul(h->Z, r->Z, r->T);
+}
+
+static void
+ge_m15_p1p1_to_p3(ge_m15_p3 *h, const ge_m15_p1p1 *r)
+{
+	ge_m15_p1p1_to_p2(h, r);
+	f255_mul(h->T, r->X, r->Y);
+}
+
+static void
+ge_m15_p2_dbl(ge_m15_p1p1 *r, const ge_m15_p3 *p, uint32_t *t0)
+{
+	f255_square(r->X, p->X);
+	f255_square(r->Z, p->Y);
+	f255_square(r->T, p->Z);
+	f255_add(r->T, r->T, r->T);
+	f255_add(r->Y, p->X, p->Y);
+	f255_square(t0, r->Y);
+	f255_add(r->Y, r->Z, r->X);
+	f255_sub(r->Z, r->Z, r->X);
+	f255_sub(r->X, t0, r->Y);
+	f255_sub(r->T, r->T, r->Z);
+}
+
+static void
+ge_m15_madd(ge_m15_p1p1 *r, const ge_m15_p3 *h, const ge_m15_precomp *q,
+            uint32_t neg, uint32_t *t0)
+{
+	f255_add(r->X, h->Y, h->X);
+	f255_sub(r->Y, h->Y, h->X);
+	f255_mul(r->Z, r->X, q->yplusx);
+	f255_mul(r->Y, r->Y, q->yminusx);
+	f255_mul(r->T, q->xy2d, h->T);
+	f255_add(t0, h->Z, h->Z);
+	f255_sub(r->X, r->Z, r->Y);
+	f255_add(r->Y, r->Z, r->Y);
+	f255_add(r->Z, t0, r->T);
+	f255_sub(r->T, t0, r->T);
+	/* -Q negates 2dxy and with it C = 2dxy T, which swaps Z = D + C and
+	   T = D - C; the swap replaces a field negation in the select */
+	cswap(r->Z, r->T, neg);
+}
+
+/*
+ * 13 bit limbs straight from the eight little endian words of a selected
+ * coordinate; the branch depends on the loop counter only.
+ */
+static void
+le32_to_le13(uint32_t *dst, const uint32_t *src)
+{
+	int k;
+
+	for (k = 0; k < 19; k ++) {
+		int bit = 13 * k;
+		uint32_t v = src[bit >> 5] >> (bit & 31);
+
+		if ((bit & 31) > 19) {
+			v |= src[(bit >> 5) + 1] << (32 - (bit & 31));
+		}
+		dst[k] = v & 0x1FFF;
+	}
+	dst[19] = (src[7] >> 23) & 0xFF;
+}
+
+/*
+ * q = sign(b) * |b| * 16^(4 pos) B from the packed table, in constant time;
+ * sel is 24 words of caller scratch so the wipe of the caller covers it.
+ * Returns the sign for the addition to apply.
+ */
+static uint32_t
+ge_m15_select(ge_m15_precomp *q, int pos, signed char b, uint32_t *sel)
+{
+	static const uint32_t M15_BASE_ATTR base_packed[16][8][24] = {
+#include "crypto_core/ed25519/ref10/base_packed.h"
+	};
+	uint32_t bneg, babs;
+	int i, j;
+
+	/* sign and magnitude of the digit in unsigned arithmetic only */
+	bneg = ((uint32_t) b) >> 31;
+	babs = (((uint32_t) b ^ (0 - bneg)) - (0 - bneg)) & 0xF;
+	memset(sel, 0, 24 * sizeof(uint32_t));
+	sel[0] = 1;
+	sel[8] = 1;
+	for (j = 0; j < 8; j ++) {
+		uint32_t mask = 0 - (((babs ^ (uint32_t) (j + 1)) - 1) >> 31);
+		const uint32_t *row = base_packed[pos][j];
+
+		for (i = 0; i < 24; i ++) {
+			sel[i] ^= mask & (sel[i] ^ row[i]);
+		}
+	}
+	le32_to_le13(q->yplusx, sel);
+	le32_to_le13(q->yminusx, sel + 8);
+	le32_to_le13(q->xy2d, sel + 16);
+	/* -Q swaps y+x and y-x; the caller applies the sign of 2dxy */
+	cswap(q->yplusx, q->yminusx, bneg);
+	return bneg;
+}
+
+int
+sodium_esphome_x25519_m15_base(unsigned char *q, const unsigned char *n)
+{
+	struct {
+		ge_m15_p3 h;
+		ge_m15_p1p1 r;
+		ge_m15_precomp p;
+		f255_elt t0;
+		uint32_t sel[24];
+		signed char e[64];
+	} w;
+	signed char carry;
+	int i, pass;
+
+	/* clamped scalar as signed base 16 digits, as ref10 */
+	memset(&w, 0, sizeof w);
+	for (i = 0; i < 32; i ++) {
+		w.e[2 * i] = (signed char) (n[i] & 15);
+		w.e[2 * i + 1] = (signed char) ((n[i] >> 4) & 15);
+	}
+	w.e[0] &= 8;
+	w.e[63] = (signed char) ((w.e[63] & 7) | 4);
+	carry = 0;
+	for (i = 0; i < 63; i ++) {
+		w.e[i] = (signed char) (w.e[i] + carry);
+		carry = (signed char) ((w.e[i] + 8) >> 4);
+		w.e[i] = (signed char) (w.e[i] - (carry << 4));
+	}
+	w.e[63] = (signed char) (w.e[63] + carry);
+
+	/* identity in extended coordinates */
+	w.h.Y[0] = 1;
+	w.h.Z[0] = 1;
+
+	/* the table covers 16^(4k): four passes over i % 4 with four
+	   doublings between them, as ref10's walk over the packed table */
+	for (pass = 3; pass >= 0; pass --) {
+		if (pass != 3) {
+			ge_m15_p2_dbl(&w.r, &w.h, w.t0);
+			for (i = 0; i < 3; i ++) {
+				ge_m15_p1p1_to_p2(&w.h, &w.r);
+				ge_m15_p2_dbl(&w.r, &w.h, w.t0);
+			}
+			ge_m15_p1p1_to_p3(&w.h, &w.r);
+		}
+		for (i = pass; i < 64; i += 4) {
+			uint32_t neg;
+
+			SODIUM_ESP8266_YIELD();
+			neg = ge_m15_select(&w.p, i / 4, w.e[i], w.sel);
+			ge_m15_madd(&w.r, &w.h, &w.p, neg, w.t0);
+			ge_m15_p1p1_to_p3(&w.h, &w.r);
+		}
+	}
+
+	/* u = (Z + Y) / (Z - Y), in the dead completed point */
+	f255_add(w.t0, w.h.Z, w.h.Y);
+	f255_sub(w.r.X, w.h.Z, w.h.Y);
+	f255_invert(w.r.Y, w.r.X, w.r.Z);
+	f255_mul(w.t0, w.t0, w.r.Y);
+	reduce_final_f255(w.t0);
+	le13_to_le8(q, 32, w.t0);
 	sodium_memzero(&w, sizeof w);
 	return 0;
 }

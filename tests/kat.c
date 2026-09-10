@@ -9,12 +9,14 @@
  * 3. A block0-only call must leave the session counter so that a following
  *    session_xor produces the same ciphertext as the fused call.
  * 4. X25519 must reproduce the RFC 7748 vectors (including the iterated
- *    one), both through the library and through the m15 ladder in
- *    port/x25519_m15.c, and the ladder must agree with the library on
- *    random inputs. Built with SODIUM_ESPHOME_TEST_ESP8266_PATHS the
- *    library itself runs the ESP8266 code (patches 08 and 09), and with
- *    SODIUM_ESPHOME_TEST_NARROW_MUL the RP2040 arrangement (m15 ladder,
- *    reference field products), so the same vectors cover those builds too.
+ *    one), both through the library and through the m15 ladder and base
+ *    point multiply in port/x25519_m15.c; the ladder must agree with the
+ *    library on random inputs and the m15 base point multiply must match
+ *    upstream's ref10 one byte for byte. Built with
+ *    SODIUM_ESPHOME_TEST_ESP8266_PATHS the library itself runs the ESP8266
+ *    code (patches 08, 09 and 18), and with SODIUM_ESPHOME_TEST_NARROW_MUL
+ *    the RP2040 arrangement (m15 X25519, reference field products), so the
+ *    same vectors cover those builds too.
  * 5. Poly1305 must reproduce the RFC 8439 vector, and the library's Poly1305
  *    must agree with a reference written in this file with ordinary int64
  *    products on random inputs at every message and key offset, so the
@@ -42,6 +44,9 @@
 
 #include <sodium/esphome_platform.h>
 #include <sodium/esphome_x25519_m15.h>
+
+/* upstream's ref10 base multiply, built by x25519_reference.c */
+int ref_x25519_base(unsigned char *q, const unsigned char *n);
 
 #if defined(__has_include)
 # if __has_include(<sodium/sodium_esphome.h>)
@@ -272,6 +277,7 @@ static const unsigned char x25519_shared[32] = {
 static const unsigned char x25519_basepoint[32] = { 9 };
 
 typedef int (*x25519_fn)(unsigned char *, const unsigned char *, const unsigned char *);
+typedef int (*x25519_base_fn)(unsigned char *, const unsigned char *);
 
 static void test_x25519_vectors(x25519_fn fn, const char *name)
 {
@@ -315,18 +321,28 @@ static void test_x25519_vectors(x25519_fn fn, const char *name)
 static void test_x25519_base_vectors(void)
 {
     unsigned char out[32];
+    static const struct {
+        x25519_base_fn fn;
+        const char *name;
+    } impls[] = {
+        { crypto_scalarmult_curve25519_base, "base point multiply" },
+        { sodium_esphome_x25519_m15_base, "m15 base point multiply" },
+    };
+    char what[64];
+    size_t v;
 
-    check(crypto_scalarmult_curve25519_base(out, x25519_alice_priv) == 0 &&
-              memcmp(out, x25519_alice_pub, 32) == 0,
-          "base point multiply, RFC 7748 Alice");
-    check(crypto_scalarmult_curve25519_base(out, x25519_bob_priv) == 0 &&
-              memcmp(out, x25519_bob_pub, 32) == 0,
-          "base point multiply, RFC 7748 Bob");
+    for (v = 0; v < sizeof impls / sizeof impls[0]; v++) {
+        snprintf(what, sizeof what, "%s, RFC 7748 Alice", impls[v].name);
+        check(impls[v].fn(out, x25519_alice_priv) == 0 && memcmp(out, x25519_alice_pub, 32) == 0, what);
+        snprintf(what, sizeof what, "%s, RFC 7748 Bob", impls[v].name);
+        check(impls[v].fn(out, x25519_bob_priv) == 0 && memcmp(out, x25519_bob_pub, 32) == 0, what);
+    }
 }
 
 static void test_x25519_differential(void)
 {
     unsigned char k[32], u[32], a[32], b[32];
+    int before = failures;
     int i;
 
     for (i = 0; i < 500; i++) {
@@ -344,6 +360,13 @@ static void test_x25519_differential(void)
         check(sodium_esphome_x25519_m15(a, k, x25519_basepoint) == 0 &&
                   crypto_scalarmult_curve25519_base(b, k) == 0 && memcmp(a, b, 32) == 0,
               "m15 ladder vs library base point multiply");
+        /* and the m15 base multiply byte for byte against upstream's */
+        check(sodium_esphome_x25519_m15_base(a, k) == 0 && ref_x25519_base(b, k) == 0 &&
+                  memcmp(a, b, 32) == 0,
+              "m15 base point multiply vs upstream ref10");
+    }
+    if (failures == before) {
+        printf("x25519: m15 base point multiply byte identical to upstream ref10 on 500 random scalars\n");
     }
 }
 
