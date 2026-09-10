@@ -1,0 +1,48 @@
+diff --git a/src/libsodium/crypto_core/ed25519/ref10/ed25519_ref10.c b/src/libsodium/crypto_core/ed25519/ref10/ed25519_ref10.c
+index 1a293cbb..db8f65ca 100644
+--- a/src/libsodium/crypto_core/ed25519/ref10/ed25519_ref10.c
++++ b/src/libsodium/crypto_core/ed25519/ref10/ed25519_ref10.c
+@@ -5,6 +5,7 @@
+ 
+ #include "crypto_verify_32.h"
+ #include "private/common.h"
++#define SODIUM_ESPHOME_FE25519_DEFINE
+ #include "private/ed25519_ref10.h"
+ #include "utils.h"
+ 
+diff --git a/src/libsodium/include/sodium/private/ed25519_ref10_fe_25_5.h b/src/libsodium/include/sodium/private/ed25519_ref10_fe_25_5.h
+index 78c3f4a5..178275c3 100644
+--- a/src/libsodium/include/sodium/private/ed25519_ref10_fe_25_5.h
++++ b/src/libsodium/include/sodium/private/ed25519_ref10_fe_25_5.h
+@@ -370,7 +370,13 @@ fe25519_iszero(const fe25519 f)
+  With tighter constraints on inputs can squeeze carries into int32.
+  */
+ 
+-static void
++/* One copy of the two large products, defined by ed25519_ref10.c, instead
++   of a static copy in every file that includes this header. */
++void fe25519_mul(fe25519 h, const fe25519 f, const fe25519 g);
++void fe25519_sq(fe25519 h, const fe25519 f);
++
++#ifdef SODIUM_ESPHOME_FE25519_DEFINE
++void
+ fe25519_mul(fe25519 h, const fe25519 f, const fe25519 g)
+ {
+     int32_t f0 = f[0];
+@@ -743,7 +749,7 @@ fe25519_mul(fe25519 h, const fe25519 f, const fe25519 g)
+  |h| bounded by 1.01*2^25,1.01*2^24,1.01*2^25,1.01*2^24,etc.
+  */
+ 
+-static void
++void
+ fe25519_sq(fe25519 h, const fe25519 f)
+ {
+     int32_t f0 = f[0];
+@@ -961,6 +967,7 @@ fe25519_sq(fe25519 h, const fe25519 f)
+     h[8] = (int32_t) h8;
+     h[9] = (int32_t) h9;
+ }
++#endif
+ 
+ /*
+  h = 2 * f * f
