@@ -1,0 +1,181 @@
+diff --git a/src/libsodium/crypto_hash/sha256/cp/hash_sha256_cp.c b/src/libsodium/crypto_hash/sha256/cp/hash_sha256_cp.c
+index 832dabb9..dfeb4f14 100644
+--- a/src/libsodium/crypto_hash/sha256/cp/hash_sha256_cp.c
++++ b/src/libsodium/crypto_hash/sha256/cp/hash_sha256_cp.c
+@@ -35,6 +35,7 @@
+ 
+ #include "crypto_hash_sha256.h"
+ #include "private/common.h"
++#include "sodium/esphome_platform.h"
+ #include "utils.h"
+ 
+ static void
+@@ -53,7 +54,11 @@ be32dec_vect(uint32_t *dst, const unsigned char *src, size_t len)
+     size_t i;
+ 
+     for (i = 0; i < len / 4; i++) {
++#ifdef SODIUM_ESPHOME_ESP8266_PATHS
++        dst[i] = sodium_esphome_load32_be(src + i * 4);
++#else
+         dst[i] = LOAD32_BE(src + i * 4);
++#endif
+     }
+ }
+ 
+@@ -96,63 +101,50 @@ static const uint32_t SHA256_KRND_ATTR Krnd[64] = {
+     d += h;                            \
+     h += S0(a) + Maj(a, b, c);
+ 
+-#define RNDr(S, W, i, ii)                                                   \
+-    RND(S[(64 - i) % 8], S[(65 - i) % 8], S[(66 - i) % 8], S[(67 - i) % 8], \
+-        S[(68 - i) % 8], S[(69 - i) % 8], S[(70 - i) % 8], S[(71 - i) % 8], \
+-        W[i + ii] + Krnd[i + ii])
+-
+-#define MSCH(W, ii, i) \
+-    W[i + ii + 16] =   \
+-        s1(W[i + ii + 14]) + W[i + ii + 9] + s0(W[i + ii + 1]) + W[i + ii]
+-
++/* One round per pass with the working variables rotated by hand, and the
++   message schedule filled in as the rounds reach it, in place of 64
++   unrolled rounds: about 2.1 KB less flash. A Noise handshake hashes a few
++   dozen short inputs and the transport none, so the per block cost does
++   not reach a connect on any target. */
+ static void
+-SHA256_Transform(uint32_t state[8], const uint8_t block[64], uint32_t W[64],
+-                 uint32_t S[8])
++SHA256_Transform(uint32_t state[8], const uint8_t block[64], uint32_t W[64])
+ {
++    uint32_t a, b, c, d, e, f, g, h, t;
+     int i;
+ 
+     be32dec_vect(W, block, 64);
+-    memcpy(S, state, 32);
+-    for (i = 0; i < 64; i += 16) {
+-        RNDr(S, W, 0, i);
+-        RNDr(S, W, 1, i);
+-        RNDr(S, W, 2, i);
+-        RNDr(S, W, 3, i);
+-        RNDr(S, W, 4, i);
+-        RNDr(S, W, 5, i);
+-        RNDr(S, W, 6, i);
+-        RNDr(S, W, 7, i);
+-        RNDr(S, W, 8, i);
+-        RNDr(S, W, 9, i);
+-        RNDr(S, W, 10, i);
+-        RNDr(S, W, 11, i);
+-        RNDr(S, W, 12, i);
+-        RNDr(S, W, 13, i);
+-        RNDr(S, W, 14, i);
+-        RNDr(S, W, 15, i);
+-        if (i == 48) {
+-            break;
++    a = state[0];
++    b = state[1];
++    c = state[2];
++    d = state[3];
++    e = state[4];
++    f = state[5];
++    g = state[6];
++    h = state[7];
++    for (i = 0; i < 64; i++) {
++        if (i >= 16) {
++            W[i] = s1(W[i - 2]) + W[i - 7] + s0(W[i - 15]) + W[i - 16];
+         }
+-        MSCH(W, 0, i);
+-        MSCH(W, 1, i);
+-        MSCH(W, 2, i);
+-        MSCH(W, 3, i);
+-        MSCH(W, 4, i);
+-        MSCH(W, 5, i);
+-        MSCH(W, 6, i);
+-        MSCH(W, 7, i);
+-        MSCH(W, 8, i);
+-        MSCH(W, 9, i);
+-        MSCH(W, 10, i);
+-        MSCH(W, 11, i);
+-        MSCH(W, 12, i);
+-        MSCH(W, 13, i);
+-        MSCH(W, 14, i);
+-        MSCH(W, 15, i);
+-    }
+-    for (i = 0; i < 8; i++) {
+-        state[i] += S[i];
++        /* RND leaves the new a in h and the new e in d */
++        RND(a, b, c, d, e, f, g, h, W[i] + Krnd[i]);
++        t = h;
++        h = g;
++        g = f;
++        f = e;
++        e = d;
++        d = c;
++        c = b;
++        b = a;
++        a = t;
+     }
++    state[0] += a;
++    state[1] += b;
++    state[2] += c;
++    state[3] += d;
++    state[4] += e;
++    state[5] += f;
++    state[6] += g;
++    state[7] += h;
+ }
+ 
+ static const uint8_t PAD[64] = { 0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+@@ -162,7 +154,7 @@ static const uint8_t PAD[64] = { 0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                  0,    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+ 
+ static void
+-SHA256_Pad(crypto_hash_sha256_state *state, uint32_t tmp32[64 + 8])
++SHA256_Pad(crypto_hash_sha256_state *state, uint32_t tmp32[64])
+ {
+     unsigned int r;
+     unsigned int i;
+@@ -177,11 +169,11 @@ SHA256_Pad(crypto_hash_sha256_state *state, uint32_t tmp32[64 + 8])
+         for (i = 0; i < 64 - r; i++) {
+             state->buf[r + i] = PAD[i];
+         }
+-        SHA256_Transform(state->state, state->buf, &tmp32[0], &tmp32[64]);
++        SHA256_Transform(state->state, state->buf, tmp32);
+         memset(&state->buf[0], 0, 56);
+     }
+     STORE64_BE(&state->buf[56], state->count);
+-    SHA256_Transform(state->state, state->buf, &tmp32[0], &tmp32[64]);
++    SHA256_Transform(state->state, state->buf, tmp32);
+ }
+ 
+ int
+@@ -202,7 +194,7 @@ int
+ crypto_hash_sha256_update(crypto_hash_sha256_state *state,
+                           const unsigned char *in, unsigned long long inlen)
+ {
+-    uint32_t           tmp32[64 + 8];
++    uint32_t           tmp32[64];
+     unsigned long long i;
+     unsigned long long r;
+ 
+@@ -222,12 +214,12 @@ crypto_hash_sha256_update(crypto_hash_sha256_state *state,
+     for (i = 0; i < 64 - r; i++) {
+         state->buf[r + i] = in[i];
+     }
+-    SHA256_Transform(state->state, state->buf, &tmp32[0], &tmp32[64]);
++    SHA256_Transform(state->state, state->buf, tmp32);
+     in += 64 - r;
+     inlen -= 64 - r;
+ 
+     while (inlen >= 64) {
+-        SHA256_Transform(state->state, in, &tmp32[0], &tmp32[64]);
++        SHA256_Transform(state->state, in, tmp32);
+         in += 64;
+         inlen -= 64;
+     }
+@@ -243,7 +235,7 @@ crypto_hash_sha256_update(crypto_hash_sha256_state *state,
+ int
+ crypto_hash_sha256_final(crypto_hash_sha256_state *state, unsigned char *out)
+ {
+-    uint32_t tmp32[64 + 8];
++    uint32_t tmp32[64];
+ 
+     SHA256_Pad(state, tmp32);
+     be32enc_vect(out, state->state, 32);

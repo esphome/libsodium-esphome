@@ -24,10 +24,6 @@
 #endif
 
 #ifdef SODIUM_ESPHOME_ESP8266_PATHS
-/* One SHA256 round per loop pass instead of 64 unrolled (patch 14): about
-   1.4 KB less flash. A handshake hashes a few dozen short inputs and the
-   transport none, so the per block cost does not reach a connect. */
-#define SODIUM_ESPHOME_COMPACT_SHA256 1
 #include <stdint.h>
 /* Byte-wise little endian access for the unaligned paths of the block loops
    (patches 12 and 13); -Os leaves the library's out of line and the loops
@@ -36,6 +32,14 @@ static inline __attribute__((always_inline)) uint32_t
 sodium_esphome_load32_le(const unsigned char *p)
 {
     return (uint32_t) p[0] | ((uint32_t) p[1] << 8) | ((uint32_t) p[2] << 16) | ((uint32_t) p[3] << 24);
+}
+
+/* Written with + rather than |: GCC 10 folds the | form into a call to
+   libgcc's __bswapsi2, which the LX106 has no instruction for. */
+static inline __attribute__((always_inline)) uint32_t
+sodium_esphome_load32_be(const unsigned char *p)
+{
+    return ((uint32_t) p[0] << 24) + ((uint32_t) p[1] << 16) + ((uint32_t) p[2] << 8) + (uint32_t) p[3];
 }
 
 static inline __attribute__((always_inline)) void
