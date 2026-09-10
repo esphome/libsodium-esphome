@@ -529,7 +529,7 @@ static void test_sha256_differential(void)
 {
     static unsigned char msg[4096 + 64];
     unsigned char ours[32], theirs[32];
-    crypto_hash_sha256_state st;
+    crypto_hash_sha256_state st, rst;
     size_t len, off, chunk;
     int cases = 0;
     char what[96];
@@ -545,22 +545,29 @@ static void test_sha256_differential(void)
     for (chunk = 1; chunk <= 96; chunk++) {
         len = 300 + chunk * 7;
         crypto_hash_sha256_init(&st);
+        ref_sha256_init(&rst);
         for (off = 0; off < len; off += chunk) {
-            crypto_hash_sha256_update(&st, msg + off, off + chunk <= len ? chunk : len - off);
+            size_t piece = off + chunk <= len ? chunk : len - off;
+            crypto_hash_sha256_update(&st, msg + off, piece);
+            ref_sha256_update(&rst, msg + off, piece);
         }
         crypto_hash_sha256_final(&st, ours);
-        ref_sha256(theirs, msg, len);
-        snprintf(what, sizeof what, "sha256 streamed vs upstream len=%zu chunk=%zu", len, chunk);
+        ref_sha256_final(&rst, theirs);
+        snprintf(what, sizeof what, "sha256 streamed vs upstream streamed len=%zu chunk=%zu", len, chunk);
         check(memcmp(ours, theirs, 32) == 0, what);
-        cases++;
+        ref_sha256(theirs, msg, len);
+        snprintf(what, sizeof what, "sha256 streamed vs upstream one shot len=%zu chunk=%zu", len, chunk);
+        check(memcmp(ours, theirs, 32) == 0, what);
+        cases += 2;
     }
     printf("sha256: %d differentials against upstream's unrolled transform\n", cases);
 }
 
 int main(void)
 {
-    /* One and two block SHA256 vectors; guards the round constant table in
-       flash on the ESP8266 and the compact transform on every target */
+    /* One block, two block and million byte SHA256 vectors; guards the round
+       constant table in flash on the ESP8266, the compact transform on every
+       target, and update's bulk loop */
     test_sha256();
     test_sha256_differential();
 
