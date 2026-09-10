@@ -469,11 +469,8 @@ static void test_poly1305(void)
            i);
 }
 
-/* upstream's SHA256 under other names, see sha256_reference.c */
+/* upstream's SHA256 under another name, see sha256_reference.c */
 int ref_sha256(unsigned char *out, const unsigned char *in, unsigned long long inlen);
-int ref_sha256_init(crypto_hash_sha256_state *state);
-int ref_sha256_update(crypto_hash_sha256_state *state, const unsigned char *in, unsigned long long inlen);
-int ref_sha256_final(crypto_hash_sha256_state *state, unsigned char *out);
 
 /* SHA256 must reproduce the FIPS 180-4 example vectors; since patch 14
    there is one transform for every target, so the reference leg covers it */
@@ -498,7 +495,8 @@ static void test_sha256(void)
         0xf1, 0x80, 0x9a, 0x48, 0xa4, 0x97, 0x20, 0x0e,
         0x04, 0x6d, 0x39, 0xcc, 0xc7, 0x11, 0x2c, 0xd0
     };
-    static unsigned char million[4093];
+    enum { PIECE = 4089 }; /* 1 mod 4, so the offset walks every alignment */
+    static unsigned char million[PIECE + 4];
     crypto_hash_sha256_state st;
     unsigned char out[32];
     size_t fed, piece;
@@ -514,7 +512,7 @@ static void test_sha256(void)
     memset(million, 'a', sizeof million);
     crypto_hash_sha256_init(&st);
     for (fed = 0; fed < 1000000; fed += piece) {
-        piece = 1000000 - fed < 4089 ? 1000000 - fed : 4089;
+        piece = 1000000 - fed < PIECE ? 1000000 - fed : PIECE;
         crypto_hash_sha256_update(&st, million + (fed & 3), piece);
     }
     crypto_hash_sha256_final(&st, out);
@@ -529,7 +527,7 @@ static void test_sha256_differential(void)
 {
     static unsigned char msg[4096 + 64];
     unsigned char ours[32], theirs[32];
-    crypto_hash_sha256_state st, rst;
+    crypto_hash_sha256_state st;
     size_t len, off, chunk;
     int cases = 0;
     char what[96];
@@ -545,29 +543,20 @@ static void test_sha256_differential(void)
     for (chunk = 1; chunk <= 96; chunk++) {
         len = 300 + chunk * 7;
         crypto_hash_sha256_init(&st);
-        ref_sha256_init(&rst);
         for (off = 0; off < len; off += chunk) {
-            size_t piece = off + chunk <= len ? chunk : len - off;
-            crypto_hash_sha256_update(&st, msg + off, piece);
-            ref_sha256_update(&rst, msg + off, piece);
+            crypto_hash_sha256_update(&st, msg + off, off + chunk <= len ? chunk : len - off);
         }
         crypto_hash_sha256_final(&st, ours);
-        ref_sha256_final(&rst, theirs);
-        snprintf(what, sizeof what, "sha256 streamed vs upstream streamed len=%zu chunk=%zu", len, chunk);
-        check(memcmp(ours, theirs, 32) == 0, what);
         ref_sha256(theirs, msg, len);
-        snprintf(what, sizeof what, "sha256 streamed vs upstream one shot len=%zu chunk=%zu", len, chunk);
+        snprintf(what, sizeof what, "sha256 streamed vs upstream len=%zu chunk=%zu", len, chunk);
         check(memcmp(ours, theirs, 32) == 0, what);
-        cases += 2;
+        cases++;
     }
     printf("sha256: %d differentials against upstream's unrolled transform\n", cases);
 }
 
 int main(void)
 {
-    /* One block, two block and million byte SHA256 vectors; guards the round
-       constant table in flash on the ESP8266, the compact transform on every
-       target, and update's bulk loop */
     test_sha256();
     test_sha256_differential();
 
