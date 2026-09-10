@@ -1110,7 +1110,7 @@ typedef struct {
 	f255_elt yplusx, yminusx, xy2d;
 } ge_m15_precomp;
 
-/* completed -> extended: X = X*T, Y = Y*Z, Z = Z*T and, for p3, T = X*Y */
+/* completed -> projective: X = X*T, Y = Y*Z, Z = Z*T; extended adds T = X*Y */
 static void
 ge_m15_p1p1_to_p2(ge_m15_p3 *h, const ge_m15_p1p1 *r)
 {
@@ -1190,7 +1190,7 @@ static uint32_t
 ge_m15_select(ge_m15_precomp *q, int pos, signed char b, uint32_t *sel)
 {
 	static const uint32_t M15_BASE_ATTR base_packed[16][8][24] = {
-#include "../libsodium/src/libsodium/crypto_core/ed25519/ref10/base_packed.h"
+#include "crypto_core/ed25519/ref10/base_packed.h"
 	};
 	uint32_t bneg, babs;
 	int i, j;

@@ -1,7 +1,9 @@
 /* Upstream's ref10 X25519 base point multiply, as it is at the pinned tag, for
    the differential in kat.c. run_kat.sh builds this against a pristine copy
-   of the submodule; every external symbol is renamed so the copies link
-   beside the fork's. */
+   of the submodule; every symbol is renamed so the copies link beside the
+   fork's. */
+#define crypto_scalarmult_curve25519_ref10 ref_crypto_scalarmult_curve25519_ref10
+#define crypto_scalarmult_curve25519_ref10_base ref_crypto_scalarmult_curve25519_ref10_base
 #define crypto_scalarmult_curve25519_ref10_implementation ref_crypto_scalarmult_curve25519_ref10_implementation
 #define fe25519_frombytes ref_fe25519_frombytes
 #define fe25519_invert ref_fe25519_invert

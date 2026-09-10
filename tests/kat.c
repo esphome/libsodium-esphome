@@ -328,13 +328,14 @@ static void test_x25519_base_vectors(void)
         { crypto_scalarmult_curve25519_base, "base point multiply" },
         { sodium_esphome_x25519_m15_base, "m15 base point multiply" },
     };
+    char what[64];
     size_t v;
 
     for (v = 0; v < sizeof impls / sizeof impls[0]; v++) {
-        check(impls[v].fn(out, x25519_alice_priv) == 0 && memcmp(out, x25519_alice_pub, 32) == 0,
-              impls[v].name);
-        check(impls[v].fn(out, x25519_bob_priv) == 0 && memcmp(out, x25519_bob_pub, 32) == 0,
-              impls[v].name);
+        snprintf(what, sizeof what, "%s, RFC 7748 Alice", impls[v].name);
+        check(impls[v].fn(out, x25519_alice_priv) == 0 && memcmp(out, x25519_alice_pub, 32) == 0, what);
+        snprintf(what, sizeof what, "%s, RFC 7748 Bob", impls[v].name);
+        check(impls[v].fn(out, x25519_bob_priv) == 0 && memcmp(out, x25519_bob_pub, 32) == 0, what);
     }
 }
 

@@ -23,6 +23,7 @@
         "includeDir": "libsodium/src/libsodium/include",
         "srcDir": "libsodium/src/libsodium",
         "flags": [
+            "-I libsodium/src/libsodium",
             "-I libsodium/src/libsodium/include/sodium",
             "-I port_include",
             "-D CONFIGURED=1",
