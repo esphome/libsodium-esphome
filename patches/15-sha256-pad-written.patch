@@ -1,0 +1,52 @@
+diff --git a/src/libsodium/crypto_hash/sha256/cp/hash_sha256_cp.c b/src/libsodium/crypto_hash/sha256/cp/hash_sha256_cp.c
+index 5a6e3b33..270b6bde 100644
+--- a/src/libsodium/crypto_hash/sha256/cp/hash_sha256_cp.c
++++ b/src/libsodium/crypto_hash/sha256/cp/hash_sha256_cp.c
+@@ -70,7 +70,7 @@ be32dec_vect(uint32_t *dst, const unsigned char *src, size_t len)
+    can live in flash like the ed25519 base table; keeps 256 bytes of DRAM
+    free. Flash only supports aligned 32-bit access, so the alignment is
+    stated explicitly rather than left to the array's natural alignment.
+-   PAD and the initial state stay in DRAM: they are memcpy'd byte-wise. */
++   The initial state stays in DRAM: it is memcpy'd byte-wise. */
+ #define SHA256_KRND_ATTR CRYPTO_ALIGN(4) __attribute__((section(".irom.text")))
+ #else
+ #define SHA256_KRND_ATTR
+@@ -155,31 +155,22 @@ SHA256_Transform(uint32_t state[8], const uint8_t block[64], uint32_t W[64])
+     state[7] += h;
+ }
+ 
+-static const uint8_t PAD[64] = { 0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+-                                 0,    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+-                                 0,    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+-                                 0,    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+-                                 0,    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+-
+ static void
+ SHA256_Pad(crypto_hash_sha256_state *state, uint32_t tmp32[64])
+ {
+     unsigned int r;
+-    unsigned int i;
+ 
+     ACQUIRE_FENCE;
+     r = (unsigned int) ((state->count >> 3) & 0x3f);
+-    if (r < 56) {
+-        for (i = 0; i < 56 - r; i++) {
+-            state->buf[r + i] = PAD[i];
+-        }
+-    } else {
+-        for (i = 0; i < 64 - r; i++) {
+-            state->buf[r + i] = PAD[i];
+-        }
++    /* The padding is one 0x80 and zeros to the length field, written
++       rather than copied from a table the ESP8266 would keep in DRAM. */
++    state->buf[r++] = 0x80;
++    if (r > 56) {
++        memset(&state->buf[r], 0, 64 - r);
+         SHA256_Transform(state->state, state->buf, tmp32);
+-        memset(&state->buf[0], 0, 56);
++        r = 0;
+     }
++    memset(&state->buf[r], 0, 56 - r);
+     STORE64_BE(&state->buf[56], state->count);
+     SHA256_Transform(state->state, state->buf, tmp32);
+ }
