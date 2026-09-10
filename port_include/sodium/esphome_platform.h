@@ -25,13 +25,21 @@
 
 #ifdef SODIUM_ESPHOME_ESP8266_PATHS
 #include <stdint.h>
-/* Byte-wise little endian access for the unaligned paths of the block loops
-   (patches 12 and 13); -Os leaves the library's out of line and the loops
-   call them dozens of times per block. */
+/* Byte-wise access for the unaligned paths of the block loops (patches 12
+   and 13) and the SHA256 block decode (patch 14); -Os leaves the library's
+   out of line and the loops call them dozens of times per block. */
 static inline __attribute__((always_inline)) uint32_t
 sodium_esphome_load32_le(const unsigned char *p)
 {
     return (uint32_t) p[0] | ((uint32_t) p[1] << 8) | ((uint32_t) p[2] << 16) | ((uint32_t) p[3] << 24);
+}
+
+/* Written with + rather than |: GCC 10 folds the | form into a call to
+   libgcc's __bswapsi2, which the LX106 has no instruction for. */
+static inline __attribute__((always_inline)) uint32_t
+sodium_esphome_load32_be(const unsigned char *p)
+{
+    return ((uint32_t) p[0] << 24) + ((uint32_t) p[1] << 16) + ((uint32_t) p[2] << 8) + (uint32_t) p[3];
 }
 
 static inline __attribute__((always_inline)) void

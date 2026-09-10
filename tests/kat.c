@@ -20,6 +20,10 @@
  *    products on random inputs at every message and key offset, so the
  *    ESP8266 product helper and the byte-wise loads (patch 12) are checked
  *    against code that uses neither.
+ * 6. SHA256 must reproduce the FIPS 180-4 examples, and the library's
+ *    compact transform (patch 14) must agree byte for byte with upstream's
+ *    unrolled one, compiled beside it from the unpatched submodule, over
+ *    every length up to four blocks and a sweep of streaming chunk sizes.
  *
  * Build against the patched submodule (run pack.sh style patch application
  * first); see .github/workflows/ci.yml.
@@ -465,20 +469,96 @@ static void test_poly1305(void)
            i);
 }
 
+/* upstream's SHA256 under another name, see sha256_reference.c */
+int ref_sha256(unsigned char *out, const unsigned char *in, unsigned long long inlen);
+
+/* SHA256 must reproduce the FIPS 180-4 example vectors; since patch 14
+   there is one transform for every target, so the reference leg covers it */
+static void test_sha256(void)
+{
+    static const unsigned char expected[32] = {
+        0xba, 0x78, 0x16, 0xbf, 0x8f, 0x01, 0xcf, 0xea, 0x41, 0x41, 0x40, 0xde,
+        0x5d, 0xae, 0x22, 0x23, 0xb0, 0x03, 0x61, 0xa3, 0x96, 0x17, 0x7a, 0x9c,
+        0xb4, 0x10, 0xff, 0x61, 0xf2, 0x00, 0x15, 0xad
+    };
+    static const unsigned char two_blocks[] =
+        "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq";
+    static const unsigned char expected2[32] = {
+        0x24, 0x8d, 0x6a, 0x61, 0xd2, 0x06, 0x38, 0xb8,
+        0xe5, 0xc0, 0x26, 0x93, 0x0c, 0x3e, 0x60, 0x39,
+        0xa3, 0x3c, 0xe4, 0x59, 0x64, 0xff, 0x21, 0x67,
+        0xf6, 0xec, 0xed, 0xd4, 0x19, 0xdb, 0x06, 0xc1
+    };
+    static const unsigned char expected3[32] = {
+        0xcd, 0xc7, 0x6e, 0x5c, 0x99, 0x14, 0xfb, 0x92,
+        0x81, 0xa1, 0xc7, 0xe2, 0x84, 0xd7, 0x3e, 0x67,
+        0xf1, 0x80, 0x9a, 0x48, 0xa4, 0x97, 0x20, 0x0e,
+        0x04, 0x6d, 0x39, 0xcc, 0xc7, 0x11, 0x2c, 0xd0
+    };
+    enum { PIECE = 4089 }; /* 1 mod 4, so the offset walks every alignment */
+    static unsigned char million[PIECE + 4];
+    crypto_hash_sha256_state st;
+    unsigned char out[32];
+    size_t fed, piece;
+    crypto_hash_sha256(out, (const unsigned char *) "abc", 3);
+    check(memcmp(out, expected, 32) == 0, "sha256 known answer");
+    /* Two blocks, so the state carries across a block boundary;
+       FIPS 180-4 example B.2 */
+    crypto_hash_sha256(out, two_blocks, sizeof two_blocks - 1);
+    check(memcmp(out, expected2, 32) == 0, "sha256 two block known answer");
+    /* A million bytes, FIPS 180-4 example B.3, fed in odd sized pieces from
+       a pointer that walks the four alignments, so update's bulk loop sees
+       the caller's buffer at each of them */
+    memset(million, 'a', sizeof million);
+    crypto_hash_sha256_init(&st);
+    for (fed = 0; fed < 1000000; fed += piece) {
+        piece = 1000000 - fed < PIECE ? 1000000 - fed : PIECE;
+        crypto_hash_sha256_update(&st, million + (fed & 3), piece);
+    }
+    crypto_hash_sha256_final(&st, out);
+    check(memcmp(out, expected3, 32) == 0, "sha256 million byte known answer");
+}
+
+/* The compact transform against upstream's unrolled one: one shot over
+   every length up to four blocks plus a few long ones, and streamed through
+   update in chunks of every size up to a block and a half, so the buffered
+   path and the padding are compared as well as the rounds */
+static void test_sha256_differential(void)
+{
+    static unsigned char msg[4096 + 64];
+    unsigned char ours[32], theirs[32];
+    crypto_hash_sha256_state st;
+    size_t len, off, chunk;
+    int cases = 0;
+    char what[96];
+
+    randombytes_buf(msg, sizeof msg);
+    for (len = 0; len <= sizeof msg; len = len < 260 ? len + 1 : len + 397) {
+        crypto_hash_sha256(ours, msg, len);
+        ref_sha256(theirs, msg, len);
+        snprintf(what, sizeof what, "sha256 vs upstream len=%zu", len);
+        check(memcmp(ours, theirs, 32) == 0, what);
+        cases++;
+    }
+    for (chunk = 1; chunk <= 96; chunk++) {
+        len = 300 + chunk * 7;
+        crypto_hash_sha256_init(&st);
+        for (off = 0; off < len; off += chunk) {
+            crypto_hash_sha256_update(&st, msg + off, off + chunk <= len ? chunk : len - off);
+        }
+        crypto_hash_sha256_final(&st, ours);
+        ref_sha256(theirs, msg, len);
+        snprintf(what, sizeof what, "sha256 streamed vs upstream len=%zu chunk=%zu", len, chunk);
+        check(memcmp(ours, theirs, 32) == 0, what);
+        cases++;
+    }
+    printf("sha256: %d differentials against upstream's unrolled transform\n", cases);
+}
+
 int main(void)
 {
-    /* FIPS 180-4 example: SHA-256("abc"). Guards the round constant table
-       patch 07 relocates on ESP8266. */
-    {
-        static const unsigned char expected[32] = {
-            0xba, 0x78, 0x16, 0xbf, 0x8f, 0x01, 0xcf, 0xea, 0x41, 0x41, 0x40, 0xde,
-            0x5d, 0xae, 0x22, 0x23, 0xb0, 0x03, 0x61, 0xa3, 0x96, 0x17, 0x7a, 0x9c,
-            0xb4, 0x10, 0xff, 0x61, 0xf2, 0x00, 0x15, 0xad
-        };
-        unsigned char out[32];
-        crypto_hash_sha256(out, (const unsigned char *) "abc", 3);
-        check(memcmp(out, expected, 32) == 0, "sha256 known answer");
-    }
+    test_sha256();
+    test_sha256_differential();
 
     test_rfc8439_kat();
     test_x25519_vectors(crypto_scalarmult_curve25519, "library X25519 RFC 7748 vectors");
