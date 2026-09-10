@@ -1,8 +1,8 @@
 diff --git a/src/libsodium/crypto_core/ed25519/ref10/ed25519_ref10.c b/src/libsodium/crypto_core/ed25519/ref10/ed25519_ref10.c
-index 1a293cbb..2979bfc6 100644
+index 1a293cbb..f6aec0c2 100644
 --- a/src/libsodium/crypto_core/ed25519/ref10/ed25519_ref10.c
 +++ b/src/libsodium/crypto_core/ed25519/ref10/ed25519_ref10.c
-@@ -5,6 +5,9 @@
+@@ -5,7 +5,11 @@
  
  #include "crypto_verify_32.h"
  #include "private/common.h"
@@ -10,20 +10,27 @@ index 1a293cbb..2979bfc6 100644
 +   see ed25519_ref10_fe_25_5.h */
 +#define ED25519_REF10_FE25519_IMPLEMENTATION
  #include "private/ed25519_ref10.h"
++#undef ED25519_REF10_FE25519_IMPLEMENTATION
  #include "utils.h"
  
+ #include "sodium/esphome_yield.h"
 diff --git a/src/libsodium/include/sodium/private/ed25519_ref10_fe_25_5.h b/src/libsodium/include/sodium/private/ed25519_ref10_fe_25_5.h
-index 78c3f4a5..4c856570 100644
+index 78c3f4a5..9e982115 100644
 --- a/src/libsodium/include/sodium/private/ed25519_ref10_fe_25_5.h
 +++ b/src/libsodium/include/sodium/private/ed25519_ref10_fe_25_5.h
-@@ -63,7 +63,16 @@ fe25519_1(fe25519 h)
+@@ -63,7 +63,21 @@ fe25519_1(fe25519 h)
   |h| bounded by 1.1*2^26,1.1*2^25,1.1*2^26,1.1*2^25,etc.
   */
  
 -static inline void
 +/* ESPHome port: these four are defined once, by ed25519_ref10.c, instead of
 +   as a static copy in every file that includes this header; on the wide
-+   multiply targets that drops the copies x25519_ref10.c made. */
++   multiply targets that drops the copies x25519_ref10.c made. The linked
++   names carry a prefix so they cannot collide with another library's. */
++#define fe25519_add sodium_esphome_fe25519_add
++#define fe25519_sub sodium_esphome_fe25519_sub
++#define fe25519_mul sodium_esphome_fe25519_mul
++#define fe25519_sq sodium_esphome_fe25519_sq
 +void fe25519_add(fe25519 h, const fe25519 f, const fe25519 g);
 +void fe25519_sub(fe25519 h, const fe25519 f, const fe25519 g);
 +void fe25519_mul(fe25519 h, const fe25519 f, const fe25519 g);
@@ -34,7 +41,7 @@ index 78c3f4a5..4c856570 100644
  fe25519_add(fe25519 h, const fe25519 f, const fe25519 g)
  {
      int32_t h0 = f[0] + g[0];
-@@ -88,6 +97,7 @@ fe25519_add(fe25519 h, const fe25519 f, const fe25519 g)
+@@ -88,6 +102,7 @@ fe25519_add(fe25519 h, const fe25519 f, const fe25519 g)
      h[8] = h8;
      h[9] = h9;
  }
@@ -42,7 +49,7 @@ index 78c3f4a5..4c856570 100644
  
  /*
   h = f - g
-@@ -101,7 +111,8 @@ fe25519_add(fe25519 h, const fe25519 f, const fe25519 g)
+@@ -101,7 +116,8 @@ fe25519_add(fe25519 h, const fe25519 f, const fe25519 g)
   |h| bounded by 1.1*2^26,1.1*2^25,1.1*2^26,1.1*2^25,etc.
   */
  
@@ -52,7 +59,7 @@ index 78c3f4a5..4c856570 100644
  fe25519_sub(fe25519 h, const fe25519 f, const fe25519 g)
  {
      int32_t h0 = f[0] - g[0];
-@@ -126,6 +137,7 @@ fe25519_sub(fe25519 h, const fe25519 f, const fe25519 g)
+@@ -126,6 +142,7 @@ fe25519_sub(fe25519 h, const fe25519 f, const fe25519 g)
      h[8] = h8;
      h[9] = h9;
  }
@@ -60,7 +67,7 @@ index 78c3f4a5..4c856570 100644
  
  /*
   h = -f
-@@ -370,7 +382,8 @@ fe25519_iszero(const fe25519 f)
+@@ -370,7 +387,8 @@ fe25519_iszero(const fe25519 f)
   With tighter constraints on inputs can squeeze carries into int32.
   */
  
@@ -70,7 +77,7 @@ index 78c3f4a5..4c856570 100644
  fe25519_mul(fe25519 h, const fe25519 f, const fe25519 g)
  {
      int32_t f0 = f[0];
-@@ -731,6 +744,7 @@ fe25519_mul(fe25519 h, const fe25519 f, const fe25519 g)
+@@ -731,6 +749,7 @@ fe25519_mul(fe25519 h, const fe25519 f, const fe25519 g)
      h[8] = (int32_t) h8;
      h[9] = (int32_t) h9;
  }
@@ -78,7 +85,7 @@ index 78c3f4a5..4c856570 100644
  
  /*
   h = f * f
-@@ -743,7 +757,8 @@ fe25519_mul(fe25519 h, const fe25519 f, const fe25519 g)
+@@ -743,7 +762,8 @@ fe25519_mul(fe25519 h, const fe25519 f, const fe25519 g)
   |h| bounded by 1.01*2^25,1.01*2^24,1.01*2^25,1.01*2^24,etc.
   */
  
@@ -88,7 +95,7 @@ index 78c3f4a5..4c856570 100644
  fe25519_sq(fe25519 h, const fe25519 f)
  {
      int32_t f0 = f[0];
-@@ -961,6 +976,7 @@ fe25519_sq(fe25519 h, const fe25519 f)
+@@ -961,6 +981,7 @@ fe25519_sq(fe25519 h, const fe25519 f)
      h[8] = (int32_t) h8;
      h[9] = (int32_t) h9;
  }
