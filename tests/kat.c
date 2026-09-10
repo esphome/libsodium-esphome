@@ -508,13 +508,14 @@ static void test_sha256(void)
        FIPS 180-4 example B.2 */
     crypto_hash_sha256(out, two_blocks, sizeof two_blocks - 1);
     check(memcmp(out, expected2, 32) == 0, "sha256 two block known answer");
-    /* A million bytes, FIPS 180-4 example B.3, fed in odd sized pieces so
-       update's bulk loop sees the caller's buffer at every alignment */
+    /* A million bytes, FIPS 180-4 example B.3, fed in odd sized pieces from
+       a pointer that walks the four alignments, so update's bulk loop sees
+       the caller's buffer at each of them */
     memset(million, 'a', sizeof million);
     crypto_hash_sha256_init(&st);
     for (fed = 0; fed < 1000000; fed += piece) {
-        piece = 1000000 - fed < 4093 ? 1000000 - fed : 4093;
-        crypto_hash_sha256_update(&st, million, piece);
+        piece = 1000000 - fed < 4089 ? 1000000 - fed : 4089;
+        crypto_hash_sha256_update(&st, million + (fed & 3), piece);
     }
     crypto_hash_sha256_final(&st, out);
     check(memcmp(out, expected3, 32) == 0, "sha256 million byte known answer");
