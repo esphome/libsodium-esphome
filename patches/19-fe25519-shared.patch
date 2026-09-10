@@ -1,5 +1,5 @@
 diff --git a/src/libsodium/crypto_core/ed25519/ref10/ed25519_ref10.c b/src/libsodium/crypto_core/ed25519/ref10/ed25519_ref10.c
-index 1a293cbb..f6aec0c2 100644
+index 1a293cbb..0655c2a3 100644
 --- a/src/libsodium/crypto_core/ed25519/ref10/ed25519_ref10.c
 +++ b/src/libsodium/crypto_core/ed25519/ref10/ed25519_ref10.c
 @@ -5,7 +5,11 @@
@@ -8,25 +8,24 @@ index 1a293cbb..f6aec0c2 100644
  #include "private/common.h"
 +/* ESPHome port: this file holds the one copy of the shared field functions,
 +   see ed25519_ref10_fe_25_5.h */
-+#define ED25519_REF10_FE25519_IMPLEMENTATION
++#define SODIUM_ESPHOME_FE25519_IMPLEMENTATION
  #include "private/ed25519_ref10.h"
-+#undef ED25519_REF10_FE25519_IMPLEMENTATION
++#undef SODIUM_ESPHOME_FE25519_IMPLEMENTATION
  #include "utils.h"
  
  #include "sodium/esphome_yield.h"
 diff --git a/src/libsodium/include/sodium/private/ed25519_ref10_fe_25_5.h b/src/libsodium/include/sodium/private/ed25519_ref10_fe_25_5.h
-index 78c3f4a5..9e982115 100644
+index 78c3f4a5..94e5c1c1 100644
 --- a/src/libsodium/include/sodium/private/ed25519_ref10_fe_25_5.h
 +++ b/src/libsodium/include/sodium/private/ed25519_ref10_fe_25_5.h
-@@ -63,7 +63,21 @@ fe25519_1(fe25519 h)
-  |h| bounded by 1.1*2^26,1.1*2^25,1.1*2^26,1.1*2^25,etc.
-  */
+@@ -51,6 +51,19 @@ fe25519_1(fe25519 h)
+     memset(&h[2], 0, 8 * sizeof h[0]);
+ }
  
--static inline void
 +/* ESPHome port: these four are defined once, by ed25519_ref10.c, instead of
 +   as a static copy in every file that includes this header; on the wide
-+   multiply targets that drops the copies x25519_ref10.c made. The linked
-+   names carry a prefix so they cannot collide with another library's. */
++   multiply targets that drops the copies x25519_ref10.c made. As new
++   globals they carry the port prefix, so no generic name is added. */
 +#define fe25519_add sodium_esphome_fe25519_add
 +#define fe25519_sub sodium_esphome_fe25519_sub
 +#define fe25519_mul sodium_esphome_fe25519_mul
@@ -36,7 +35,15 @@ index 78c3f4a5..9e982115 100644
 +void fe25519_mul(fe25519 h, const fe25519 f, const fe25519 g);
 +void fe25519_sq(fe25519 h, const fe25519 f);
 +
-+#ifdef ED25519_REF10_FE25519_IMPLEMENTATION
+ /*
+  h = f + g
+  Can overlap h with f or g.
+@@ -63,7 +76,8 @@ fe25519_1(fe25519 h)
+  |h| bounded by 1.1*2^26,1.1*2^25,1.1*2^26,1.1*2^25,etc.
+  */
+ 
+-static inline void
++#ifdef SODIUM_ESPHOME_FE25519_IMPLEMENTATION
 +void
  fe25519_add(fe25519 h, const fe25519 f, const fe25519 g)
  {
@@ -45,7 +52,7 @@ index 78c3f4a5..9e982115 100644
      h[8] = h8;
      h[9] = h9;
  }
-+#endif /* ED25519_REF10_FE25519_IMPLEMENTATION */
++#endif /* SODIUM_ESPHOME_FE25519_IMPLEMENTATION */
  
  /*
   h = f - g
@@ -54,7 +61,7 @@ index 78c3f4a5..9e982115 100644
   */
  
 -static void
-+#ifdef ED25519_REF10_FE25519_IMPLEMENTATION
++#ifdef SODIUM_ESPHOME_FE25519_IMPLEMENTATION
 +void
  fe25519_sub(fe25519 h, const fe25519 f, const fe25519 g)
  {
@@ -63,7 +70,7 @@ index 78c3f4a5..9e982115 100644
      h[8] = h8;
      h[9] = h9;
  }
-+#endif /* ED25519_REF10_FE25519_IMPLEMENTATION */
++#endif /* SODIUM_ESPHOME_FE25519_IMPLEMENTATION */
  
  /*
   h = -f
@@ -72,7 +79,7 @@ index 78c3f4a5..9e982115 100644
   */
  
 -static void
-+#ifdef ED25519_REF10_FE25519_IMPLEMENTATION
++#ifdef SODIUM_ESPHOME_FE25519_IMPLEMENTATION
 +void
  fe25519_mul(fe25519 h, const fe25519 f, const fe25519 g)
  {
@@ -81,7 +88,7 @@ index 78c3f4a5..9e982115 100644
      h[8] = (int32_t) h8;
      h[9] = (int32_t) h9;
  }
-+#endif /* ED25519_REF10_FE25519_IMPLEMENTATION */
++#endif /* SODIUM_ESPHOME_FE25519_IMPLEMENTATION */
  
  /*
   h = f * f
@@ -90,7 +97,7 @@ index 78c3f4a5..9e982115 100644
   */
  
 -static void
-+#ifdef ED25519_REF10_FE25519_IMPLEMENTATION
++#ifdef SODIUM_ESPHOME_FE25519_IMPLEMENTATION
 +void
  fe25519_sq(fe25519 h, const fe25519 f)
  {
@@ -99,7 +106,7 @@ index 78c3f4a5..9e982115 100644
      h[8] = (int32_t) h8;
      h[9] = (int32_t) h9;
  }
-+#endif /* ED25519_REF10_FE25519_IMPLEMENTATION */
++#endif /* SODIUM_ESPHOME_FE25519_IMPLEMENTATION */
  
  /*
   h = 2 * f * f
